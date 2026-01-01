@@ -1,7 +1,8 @@
 
 export type ToolType = 'pen' | 'eraser' | 'cursor' | 'agent' | 'ability' | 'wall' | null;
 
-export type StrokeType = 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect' | 'wall' | 'stun_zone' | 'breach_x_zone' | 'breach_c_zone' | 'brimstone_c_zone' | 'brimstone_x_zone';
+export type StrokeType = 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect' | 'wall' | 'stun_zone' | 'breach_x_zone' | 'breach_c_zone' | 'brimstone_c_zone' | 'brimstone_x_zone' | 'chamber_c_zone' | 'chamber_e_zone';
+
 
 export interface DrawingObject {
     id: number;
