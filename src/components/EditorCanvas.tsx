@@ -5,6 +5,17 @@ import { useSupabaseStrategies } from '../hooks/useSupabase';
 import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing';
 import type { DrawingObject, ToolType, StrokeType } from '../types/canvas';
 
+// --- IMPORTS DES UTILITAIRES ABILITIES ---
+import { drawBreachStun, checkBreachStunHit, updateBreachStunPosition } from '../utils/abilities/breachStun';
+import { drawAstraWall, checkAstraWallHit, updateAstraWallPosition } from '../utils/abilities/astraWall';
+import { drawBreachUlt, checkBreachUltHit, updateBreachUltPosition } from '../utils/abilities/breachUlt';
+import { drawBreachAftershock, checkBreachAftershockHit, updateBreachAftershockPosition } from '../utils/abilities/breachAftershock';
+import { drawBrimstoneStim, checkBrimstoneStimHit, updateBrimstoneStimPosition } from '../utils/abilities/brimstoneStim';
+// NOUVEAU : Import pour l'Ultime de Brimstone
+import { drawBrimstoneUlt, checkBrimstoneUltHit, updateBrimstoneUltPosition } from '../utils/abilities/brimstoneUlt';
+
+import { ABILITY_SIZES } from '../utils/abilitySizes';
+
 interface EditorCanvasProps {
     mapSrc: string;
 }
@@ -39,8 +50,8 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     const [draggingObjectId, setDraggingObjectId] = useState<number | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-    // GESTION MUR : 'center' (Move) ou 'handle' (Rotate)
-    const [wallDragMode, setWallDragMode] = useState<'center' | 'handle' | null>(null);
+    // Gestion Drag Spécial
+    const [specialDragMode, setSpecialDragMode] = useState<'center' | 'handle' | null>(null);
     const [wallCenterStart, setWallCenterStart] = useState({ x: 0, y: 0 });
 
     const { savedStrategies, isLoading, showLoadModal, setShowLoadModal, saveStrategy, fetchStrategies } = useSupabaseStrategies('Ascent');
@@ -74,87 +85,28 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             ctx.globalCompositeOperation = 'source-over';
             ctx.globalAlpha = obj.opacity;
 
-            // === CAS 1 : MUR ASTRA (Ligne infinie + Contrôles) ===
-            if (obj.tool === 'wall' && obj.points.length >= 2) {
-                const p1 = obj.points[0];
-                const p2 = obj.points[1]; // p2 sera notre poignée Carrée
+            // --- ABILITIES SPECIALES VECTORIELLES ---
+            if (obj.tool === 'stun_zone') { drawBreachStun(ctx, obj); return; }
+            if (obj.tool === 'breach_x_zone') { drawBreachUlt(ctx, obj); return; }
+            if (obj.tool === 'breach_c_zone') { drawBreachAftershock(ctx, obj); return; }
+            if (obj.tool === 'wall') { drawAstraWall(ctx, obj); return; }
+            if (obj.tool === 'brimstone_c_zone') { drawBrimstoneStim(ctx, obj, imageCache.current, redrawMainCanvas); return; }
 
-                // Calcul du centre
-                const midX = (p1.x + p2.x) / 2;
-                const midY = (p1.y + p2.y) / 2;
-
-                // Calcul ligne infinie
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
-                const length = Math.sqrt(dx * dx + dy * dy);
-                const ux = dx / length;
-                const uy = dy / length;
-                const farDist = 3000;
-                const startX = midX - ux * farDist;
-                const startY = midY - uy * farDist;
-                const endX = midX + ux * farDist;
-                const endY = midY + uy * farDist;
-
-                ctx.save();
-
-                // 1. La ligne infinie (Violet net, sans néon)
-                ctx.strokeStyle = '#bd00ff';
-                ctx.lineWidth = 6;
-                ctx.lineCap = 'butt';
-                ctx.shadowBlur = 0; // Suppression du flou néon
-
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
-
-                // Fissure blanche au milieu
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // 2. Les Contrôles (TOUJOURS VISIBLES)
-                ctx.lineWidth = 2;
-
-                // -- ROND AU CENTRE (Pour bouger tout le mur) --
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.strokeStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(midX, midY, 10, 0, Math.PI * 2); // Rond de rayon 10
-                ctx.fill();
-                ctx.stroke();
-
-                // Icône de déplacement (petit point au centre)
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(midX, midY, 2, 0, Math.PI * 2);
-                ctx.fill();
-
-                // -- CARRÉ SUR P2 (Pour tourner) --
-                const squareSize = 16;
-                ctx.fillStyle = '#fbbf24'; // Jaune
-                ctx.strokeStyle = 'black';
-                ctx.beginPath();
-                // Centré sur p2
-                ctx.rect(p2.x - squareSize/2, p2.y - squareSize/2, squareSize, squareSize);
-                ctx.fill();
-                ctx.stroke();
-
-                // (SUPPRESSION DE LA LIGNE POINTILLÉE ICI)
-
-                ctx.restore();
+            // NOUVEAU : Brimstone Ult (X)
+            if (obj.tool === 'brimstone_x_zone') {
+                drawBrimstoneUlt(ctx, obj);
                 return;
             }
 
-            // === CAS 2 : IMAGES ===
+            // --- IMAGES CLASSIQUES (Inclut Brimstone E/Q) ---
             if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
                 const isAbility = obj.subtype === 'ability' || obj.imageSrc.includes('_game');
+                const isBreachFlash = obj.imageSrc.includes('breach_q');
                 const img = getOrLoadImage(obj.imageSrc, isAbility);
 
                 if (img && img.complete) {
-                    const targetSize = isAbility ? 80 : 50;
-                    const boxW = obj.width || targetSize;
-                    const boxH = obj.height || targetSize;
+                    const targetSize = obj.width || 50;
+                    const boxW = targetSize; const boxH = targetSize;
                     const naturalRatio = img.naturalWidth / img.naturalHeight;
                     let drawW = boxW; let drawH = boxH;
                     if (naturalRatio > 1) drawH = boxW / naturalRatio; else drawW = boxH * naturalRatio;
@@ -162,9 +114,11 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                     const drawX = centerX - drawW / 2; const drawY = centerY - drawH / 2;
 
                     ctx.save();
-                    if (isAbility) {
+                    // On dessine "brut" si c'est une abilité standard
+                    if (isAbility && !isBreachFlash) {
                         ctx.drawImage(img, drawX, drawY, drawW, drawH);
                     } else {
+                        // Cadre pour Agent ou Flash Breach
                         const frameX = centerX - boxW/2; const frameY = centerY - boxH/2; const borderRadius = 6;
                         ctx.beginPath();
                         if (typeof ctx.roundRect === 'function') ctx.roundRect(frameX, frameY, boxW, boxH, borderRadius); else ctx.rect(frameX, frameY, boxW, boxH);
@@ -183,7 +137,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                 return;
             }
 
-            // === CAS 3 : DESSIN ===
+            // --- DESSIN VECTORIEL ---
             ctx.strokeStyle = obj.color; ctx.lineWidth = obj.thickness; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
             if (obj.tool === 'dashed' || obj.tool === 'dashed-arrow') ctx.setLineDash([obj.thickness * 2, obj.thickness * 2]); else ctx.setLineDash([]);
             if (obj.tool === 'rect') {
@@ -205,7 +159,6 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
         e.preventDefault();
         const jsonData = e.dataTransfer.getData("application/json");
         if (!jsonData) return;
-
         try {
             const { type, name } = JSON.parse(jsonData);
             const rect = containerRef.current?.getBoundingClientRect();
@@ -216,29 +169,36 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             const finalX = (mouseX - x) / scale;
             const finalY = (mouseY - y) / scale;
 
-            if (name === 'astra_x') {
-                const newObj: DrawingObject = {
-                    id: Date.now(),
-                    tool: 'wall',
-                    subtype: 'ability',
-                    // On crée le mur horizontalement par défaut avec une certaine taille
-                    points: [{x: finalX - 100, y: finalY}, {x: finalX + 100, y: finalY}],
-                    color: '#bd00ff', thickness: 6, opacity: 1,
-                };
-                setDrawings(prev => [...prev, newObj]);
-                setCurrentTool('cursor');
-                return;
+            // ASTRA / BREACH VECTORIELS
+            if (name === 'astra_x') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'wall', subtype: 'ability', points: [{x: finalX - 100, y: finalY}, {x: finalX + 100, y: finalY}], color: '#bd00ff', thickness: 6, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
+            if (name === 'breach_e') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'stun_zone', subtype: 'ability', points: [{x: finalX, y: finalY}, {x: finalX, y: finalY - 200}], color: '#eab308', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
+            if (name === 'breach_x') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'breach_x_zone', subtype: 'ability', points: [{x: finalX, y: finalY}, {x: finalX, y: finalY - 850}], color: '#ef4444', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
+            if (name === 'breach_c') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'breach_c_zone', subtype: 'ability', points: [{x: finalX, y: finalY}, {x: finalX, y: finalY - 150}], color: '#f59e0b', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
+
+            // BRIMSTONE VECTORIELS
+            if (name === 'brimstone_c') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'brimstone_c_zone', subtype: 'ability', points: [{x: finalX, y: finalY}], color: '#f97316', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
+            // NOUVEAU : Brimstone Ult (X)
+            if (name === 'brimstone_x') {
+                setDrawings(prev => [...prev, {
+                    id: Date.now(), tool: 'brimstone_x_zone', subtype: 'ability',
+                    points: [{x: finalX, y: finalY}], // Un seul point : le centre
+                    color: '#ff4500', thickness: 0, opacity: 0.8
+                }]);
+                setCurrentTool('cursor'); return;
             }
 
+            // --- GESTION GÉNÉRIQUE (IMAGES) ---
             const finalImageSrc = type === 'ability' ? `${name}_game` : name;
-            const size = type === 'ability' ? 80 : 50;
-            const newObj: DrawingObject = {
-                id: Date.now(), tool: 'image', subtype: type, points: [], color: '#fff', thickness: 0, opacity: 1,
+            let size = type === 'ability' ? 80 : 50;
+            if (ABILITY_SIZES[name]) { size = ABILITY_SIZES[name]; }
+            const defaultOpacity = type === 'ability' ? 0.8 : 1;
+
+            setDrawings(prev => [...prev, {
+                id: Date.now(), tool: 'image', subtype: type, points: [], color: '#fff', thickness: 0, opacity: defaultOpacity,
                 imageSrc: finalImageSrc, x: finalX, y: finalY, width: size, height: size
-            };
-            setDrawings(prev => [...prev, newObj]);
+            }]);
             setCurrentTool('cursor');
-        } catch (err) { console.error("Erreur drop:", err); }
+        } catch (err) { console.error("Drop error", err); }
     };
 
     // --- INTERACTION ---
@@ -253,55 +213,34 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1) {
-            setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY };
-            if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
-            e.preventDefault(); return;
-        }
-
+        if (e.button === 1) { setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY }; if(containerRef.current) containerRef.current.style.cursor = 'grabbing'; e.preventDefault(); return; }
         const pos = getMousePos(e);
 
         if (currentTool === 'cursor') {
-            // 1. Vérification des contrôles de MUR (Priorité haute)
             for (let i = drawings.length - 1; i >= 0; i--) {
                 const obj = drawings[i];
-                if (obj.tool === 'wall') {
-                    const p1 = obj.points[0];
-                    const p2 = obj.points[1];
-                    const midX = (p1.x + p2.x) / 2;
-                    const midY = (p1.y + p2.y) / 2;
 
-                    // A. Test Carré (Rotation) -> sur p2
-                    const distP2 = Math.hypot(pos.x - p2.x, pos.y - p2.y);
-                    if (distP2 < 15) { // Rayon tolérance
-                        setDraggingObjectId(obj.id);
-                        setWallDragMode('handle');
-                        // On stocke le centre actuel, il ne doit pas bouger pendant la rotation
-                        setWallCenterStart({ x: midX, y: midY });
-                        return;
-                    }
+                // Zones spéciales vectorielles
+                if (obj.tool === 'stun_zone') { const hit = checkBreachStunHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'breach_x_zone') { const hit = checkBreachUltHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'breach_c_zone') { const hit = checkBreachAftershockHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'wall') { const hit = checkAstraWallHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.centerStart) setWallCenterStart(hit.centerStart); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'brimstone_c_zone') { const hit = checkBrimstoneStimHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
 
-                    // B. Test Rond (Déplacement) -> sur mid
-                    const distMid = Math.hypot(pos.x - midX, pos.y - midY);
-                    if (distMid < 15) {
-                        setDraggingObjectId(obj.id);
-                        setWallDragMode('center');
-                        setDragOffset({ x: pos.x - midX, y: pos.y - midY });
-                        return;
+                // NOUVEAU : Brimstone Ult (X)
+                if (obj.tool === 'brimstone_x_zone') {
+                    const hit = checkBrimstoneUltHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset); return;
                     }
                 }
-            }
 
-            // 2. Vérification objets classiques (Images)
-            for (let i = drawings.length - 1; i >= 0; i--) {
-                const obj = drawings[i];
+                // Images classiques
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = obj.width || 50; const h = obj.height || 50;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
-                        setDraggingObjectId(obj.id);
-                        setWallDragMode(null); // Pas un mur
-                        setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y });
-                        return;
+                        setDraggingObjectId(obj.id); setSpecialDragMode(null); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
             }
@@ -309,81 +248,38 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             return;
         }
 
-        // ... Outils de dessin ...
+        // Pen/Eraser
         if (currentTool === 'agent') {
-            const newAgent: DrawingObject = {
-                id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1,
-                imageSrc: selectedAgent, x: pos.x, y: pos.y, width: 50, height: 50
-            };
+            const newAgent: DrawingObject = { id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: 50, height: 50 };
             setDrawings(prev => [...prev, newAgent]); return;
         }
         if (currentTool === 'eraser') { setIsDrawing(true); eraseObjectAt(pos.x, pos.y); return; }
-        if (currentTool === 'pen') {
-            setIsDrawing(true); startPosRef.current = pos; pointsRef.current = [pos];
-            const tempCtx = getContext(tempCanvasRef);
-            if (tempCtx) { tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height); tempCtx.beginPath(); tempCtx.moveTo(pos.x, pos.y); }
-        }
+        if (currentTool === 'pen') { setIsDrawing(true); startPosRef.current = pos; pointsRef.current = [pos]; const tempCtx = getContext(tempCanvasRef); if (tempCtx) { tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height); tempCtx.beginPath(); tempCtx.moveTo(pos.x, pos.y); } }
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (isPanning) {
-            e.preventDefault(); const dx = e.clientX - panStartRef.current.x; const dy = e.clientY - panStartRef.current.y;
-            const { x, y, scale } = transformRef.current; transformRef.current = { scale, x: x + dx, y: y + dy };
-            updateTransformStyle(); panStartRef.current = { x: e.clientX, y: e.clientY }; return;
-        }
+        if (isPanning) { e.preventDefault(); const dx = e.clientX - panStartRef.current.x; const dy = e.clientY - panStartRef.current.y; const { x, y, scale } = transformRef.current; transformRef.current = { scale, x: x + dx, y: y + dy }; updateTransformStyle(); panStartRef.current = { x: e.clientX, y: e.clientY }; return; }
         const pos = getMousePos(e);
 
-        if (draggingObjectId !== null) {
+        if (draggingObjectId !== null && specialDragMode) {
             setDrawings(prev => prev.map(obj => {
-                if (obj.id === draggingObjectId) {
-                    // --- LOGIQUE MUR ---
-                    if (obj.tool === 'wall') {
-                        // 1. ROTATION (Via le carré)
-                        if (wallDragMode === 'handle') {
-                            // On tourne autour du centre fixe (wallCenterStart)
-                            // p2 suit la souris
-                            const cx = wallCenterStart.x;
-                            const cy = wallCenterStart.y;
+                if (obj.id !== draggingObjectId) return obj;
+                if (obj.tool === 'stun_zone') return updateBreachStunPosition(obj, pos, specialDragMode, dragOffset);
+                if (obj.tool === 'breach_x_zone') return updateBreachUltPosition(obj, pos, specialDragMode, dragOffset);
+                if (obj.tool === 'breach_c_zone') return updateBreachAftershockPosition(obj, pos, specialDragMode, dragOffset);
+                if (obj.tool === 'wall') return updateAstraWallPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart);
+                if (obj.tool === 'brimstone_c_zone') return updateBrimstoneStimPosition(obj, pos, dragOffset);
+                // NOUVEAU : Brimstone Ult (X)
+                if (obj.tool === 'brimstone_x_zone') return updateBrimstoneUltPosition(obj, pos, dragOffset);
+                return obj;
+            }));
+            return;
+        }
 
-                            // p1 est le miroir de p2 par rapport au centre
-                            // p1 = center - (p2 - center)
-                            const vectorX = pos.x - cx;
-                            const vectorY = pos.y - cy;
-
-                            return {
-                                ...obj,
-                                points: [
-                                    { x: cx - vectorX, y: cy - vectorY }, // p1
-                                    { x: pos.x, y: pos.y } // p2 (souris)
-                                ]
-                            };
-                        }
-                        // 2. DÉPLACEMENT (Via le rond)
-                        if (wallDragMode === 'center') {
-                            const p1 = obj.points[0];
-                            const p2 = obj.points[1];
-                            const currentMidX = (p1.x + p2.x) / 2;
-                            const currentMidY = (p1.y + p2.y) / 2;
-
-                            // On calcule le delta
-                            const targetX = pos.x - dragOffset.x;
-                            const targetY = pos.y - dragOffset.y;
-                            const dx = targetX - currentMidX;
-                            const dy = targetY - currentMidY;
-
-                            return {
-                                ...obj,
-                                points: [
-                                    { x: p1.x + dx, y: p1.y + dy },
-                                    { x: p2.x + dx, y: p2.y + dy }
-                                ]
-                            };
-                        }
-                    }
-                    // --- LOGIQUE IMAGE CLASSIQUE ---
-                    else if (obj.tool === 'image' && obj.x != null && obj.y != null) {
-                        return { ...obj, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
-                    }
+        if (draggingObjectId !== null && !specialDragMode) {
+            setDrawings(prev => prev.map(obj => {
+                if (obj.id === draggingObjectId && obj.tool === 'image') {
+                    return { ...obj, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
                 }
                 return obj;
             }));
@@ -392,93 +288,53 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
 
         if (!isDrawing) return;
         if (currentTool === 'eraser') { eraseObjectAt(pos.x, pos.y); return; }
-        if (currentTool === 'pen') {
-            pointsRef.current.push(pos); const tempCtx = getContext(tempCanvasRef); if (!tempCtx || !tempCanvasRef.current) return;
-            tempCtx.clearRect(0, 0, tempCanvasRef.current.width, tempCanvasRef.current.height);
-            tempCtx.strokeStyle = color; tempCtx.lineWidth = thickness; tempCtx.lineCap = 'round'; tempCtx.lineJoin = 'round'; tempCtx.globalAlpha = opacity;
-            if (strokeType === 'dashed' || strokeType === 'dashed-arrow') { tempCtx.setLineDash([thickness * 2, thickness * 2]); } else { tempCtx.setLineDash([]); }
-            if (strokeType === 'rect') { tempCtx.strokeRect(startPosRef.current.x, startPosRef.current.y, pos.x - startPosRef.current.x, pos.y - startPosRef.current.y);
-            } else { drawSmoothLine(tempCtx, pointsRef.current);
-                if ((strokeType === 'arrow' || strokeType === 'dashed-arrow') && pointsRef.current.length > 2) {
-                    const last = pointsRef.current[pointsRef.current.length - 1]; const prevIndex = Math.max(0, pointsRef.current.length - 5); const prev = pointsRef.current[prevIndex];
-                    if(prev && last) drawArrowHead(tempCtx, prev.x, prev.y, last.x, last.y, thickness);
-                }
-            }
-        }
+        if (currentTool === 'pen') { pointsRef.current.push(pos); const tempCtx = getContext(tempCanvasRef); if (!tempCtx || !tempCanvasRef.current) return; tempCtx.clearRect(0, 0, tempCanvasRef.current.width, tempCtx.canvas.height); tempCtx.strokeStyle = color; tempCtx.lineWidth = thickness; tempCtx.lineCap = 'round'; tempCtx.lineJoin = 'round'; tempCtx.globalAlpha = opacity; if (strokeType === 'dashed' || strokeType === 'dashed-arrow') { tempCtx.setLineDash([thickness * 2, thickness * 2]); } else { tempCtx.setLineDash([]); } if (strokeType === 'rect') { tempCtx.strokeRect(startPosRef.current.x, startPosRef.current.y, pos.x - startPosRef.current.x, pos.y - startPosRef.current.y); } else { drawSmoothLine(tempCtx, pointsRef.current); if ((strokeType === 'arrow' || strokeType === 'dashed-arrow') && pointsRef.current.length > 2) { const last = pointsRef.current[pointsRef.current.length - 1]; const prevIndex = Math.max(0, pointsRef.current.length - 5); const prev = pointsRef.current[prevIndex]; if(prev && last) drawArrowHead(tempCtx, prev.x, prev.y, last.x, last.y, thickness); } } }
     };
 
     const handleMouseUp = () => {
         if (isPanning) { setIsPanning(false); if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab'); return; }
-
-        setWallDragMode(null);
-        if (draggingObjectId !== null) { setDraggingObjectId(null); return; }
-
-        if (isDrawing) {
-            setIsDrawing(false);
-            if (currentTool === 'pen') {
-                const newDrawing: DrawingObject = { id: Date.now(), tool: strokeType, points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current], color: color, thickness: thickness, opacity: opacity };
-                setDrawings(prev => [...prev, newDrawing]);
-                const tempCtx = getContext(tempCanvasRef); if (tempCtx && tempCtx.canvas.width > 0 && tempCtx.canvas.height > 0) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
-            } pointsRef.current = [];
-        }
+        setDraggingObjectId(null); setSpecialDragMode(null); setDragOffset({ x: 0, y: 0 });
+        if (isDrawing) { setIsDrawing(false); if (currentTool === 'pen') { const newDrawing: DrawingObject = { id: Date.now(), tool: strokeType, points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current], color: color, thickness: thickness, opacity: opacity }; setDrawings(prev => [...prev, newDrawing]); const tempCtx = getContext(tempCanvasRef); if (tempCtx && tempCtx.canvas.width > 0 && tempCtx.canvas.height > 0) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height); } pointsRef.current = []; }
     };
 
-    // ... Utils (Zoom, Resize, etc.) ...
+    const eraseObjectAt = (x: number, y: number) => {
+        const hitThreshold = 10;
+        const newDrawings = drawings.filter(obj => {
+            // Gomme pour images
+            if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); }
+
+            // Gomme pour zones spéciales (multipoints)
+            if (obj.tool === 'wall' || obj.tool === 'stun_zone' || obj.tool === 'breach_x_zone' || obj.tool === 'breach_c_zone') { const p1 = obj.points[0]; const p2 = obj.points[1]; const midX = (p1.x + p2.x)/2; const midY = (p1.y + p2.y)/2; return Math.hypot(x - p1.x, y - p1.y) > 20 && Math.hypot(x - p2.x, y - p2.y) > 20 && Math.hypot(x - midX, y - midY) > 20; }
+
+            // Gomme pour zones spéciales (point unique : Brimstone C et X)
+            if (obj.tool === 'brimstone_c_zone' || obj.tool === 'brimstone_x_zone') { const center = obj.points[0]; return Math.hypot(x - center.x, y - center.y) > 25; }
+
+            if (obj.tool === 'rect' && obj.points.length >= 2) { const s = obj.points[0]; const e = obj.points[1]; const minX = Math.min(s.x, e.x) - hitThreshold; const maxX = Math.max(s.x, e.x) + hitThreshold; const minY = Math.min(s.y, e.y) - hitThreshold; const maxY = Math.max(s.y, e.y) + hitThreshold; return !(x >= minX && x <= maxX && y >= minY && y <= maxY); } const isHit = obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + hitThreshold)); return !isHit;
+        });
+        if (newDrawings.length !== drawings.length) setDrawings(newDrawings);
+    };
+
+    const updateTransformStyle = () => { if (contentRef.current) { const { x, y, scale } = transformRef.current; contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`; } };
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; };
     useEffect(() => { const container = containerRef.current; if (!container) return; const onWheel = (e: WheelEvent) => { e.preventDefault(); const { scale, x, y } = transformRef.current; const newScale = Math.min(Math.max(0.1, scale + (e.deltaY > 0 ? -1 : 1) * 0.1 * scale), 5); const rect = container.getBoundingClientRect(); const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top; const scaleRatio = newScale / scale; const newX = mouseX - (mouseX - x) * scaleRatio; const newY = mouseY - (mouseY - y) * scaleRatio; transformRef.current = { scale: newScale, x: newX, y: newY }; updateTransformStyle(); }; container.addEventListener('wheel', onWheel, { passive: false }); return () => container.removeEventListener('wheel', onWheel); }, []);
     const syncCanvasSize = useCallback(() => { const main = mainCanvasRef.current; const temp = tempCanvasRef.current; const img = imgRef.current; if (main && temp && img && img.clientWidth > 0) { main.width = img.clientWidth; main.height = img.clientHeight; temp.width = img.clientWidth; temp.height = img.clientHeight; redrawMainCanvas(); } }, [redrawMainCanvas]);
     useEffect(() => { const img = imgRef.current; if (!img) return; if (img.complete && img.naturalWidth > 0) syncCanvasSize(); const onLoad = () => syncCanvasSize(); img.addEventListener('load', onLoad); const resizeObserver = new ResizeObserver(() => syncCanvasSize()); resizeObserver.observe(img); return () => { img.removeEventListener('load', onLoad); resizeObserver.disconnect(); }; }, [syncCanvasSize]);
-    const updateTransformStyle = () => { if (contentRef.current) { const { x, y, scale } = transformRef.current; contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`; } };
-    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; };
-    const eraseObjectAt = (x: number, y: number) => { const hitThreshold = 10; const newDrawings = drawings.filter(obj => { if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); } if (obj.tool === 'rect' && obj.points.length >= 2) { const s = obj.points[0]; const e = obj.points[1]; const minX = Math.min(s.x, e.x) - hitThreshold; const maxX = Math.max(s.x, e.x) + hitThreshold; const minY = Math.min(s.y, e.y) - hitThreshold; const maxY = Math.max(s.y, e.y) + hitThreshold; return !(x >= minX && x <= maxX && y >= minY && y <= maxY); } if (obj.tool === 'wall' && obj.points.length >= 2) {
-        // Hit test simple pour gomme mur (proche du centre)
-        const midX = (obj.points[0].x + obj.points[1].x) / 2; const midY = (obj.points[0].y + obj.points[1].y) / 2;
-        return Math.hypot(x - midX, y - midY) > 20;
-    } const isHit = obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + hitThreshold)); return !isHit; }); if (newDrawings.length !== drawings.length) setDrawings(newDrawings); };
 
     return (
         <div className="flex flex-col lg:flex-row h-full w-full">
             <div className="absolute top-4 left-4 z-30 lg:static lg:h-full lg:w-auto lg:p-4 lg:bg-[#181b1e] lg:border-r lg:border-gray-800">
-                <ToolsSidebar
-                    currentTool={currentTool} setTool={setCurrentTool}
-                    strokeType={strokeType} setStrokeType={setStrokeType}
-                    color={color} setColor={setColor}
-                    opacity={opacity} setOpacity={setOpacity}
-                    thickness={thickness} setThickness={setThickness}
-                    selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent}
-                    onSave={() => saveStrategy(drawings)}
-                    onLoad={fetchStrategies}
-                />
+                <ToolsSidebar currentTool={currentTool} setTool={setCurrentTool} strokeType={strokeType} setStrokeType={setStrokeType} color={color} setColor={setColor} opacity={opacity} setOpacity={setOpacity} thickness={thickness} setThickness={setThickness} selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent} onSave={() => saveStrategy(drawings)} onLoad={fetchStrategies} />
             </div>
-
-            <div
-                ref={containerRef}
-                className="relative flex-1 w-full h-full bg-[#1f2326] overflow-hidden select-none"
-                style={{ cursor: currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'default') }}
-                onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-                onDragOver={handleDragOver} onDrop={handleDrop}
-            >
+            <div ref={containerRef} className="relative flex-1 w-full h-full bg-[#1f2326] overflow-hidden select-none" style={{ cursor: currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'default') }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDragOver={handleDragOver} onDrop={handleDrop}>
                 <div ref={contentRef} className="origin-top-left absolute top-0 left-0" draggable={false}>
                     <img ref={imgRef} src={mapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px] h-auto border-2 border-slate-600 shadow-lg" onLoad={syncCanvasSize} />
                     <canvas ref={mainCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                     <canvas ref={tempCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                 </div>
-
                 <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-3 py-1 rounded-full pointer-events-none select-none backdrop-blur-sm">
                     Molette: Zoom • Clic Molette: Pan • Glisser Agents depuis le menu
                 </div>
-
-                <LoadModal
-                    isOpen={showLoadModal}
-                    onClose={() => setShowLoadModal(false)}
-                    isLoading={isLoading}
-                    strategies={savedStrategies}
-                    onLoadStrategy={(strat) => {
-                        if (confirm(`Charger "${strat.name}" ?`)) {
-                            setDrawings(strat.data);
-                            setShowLoadModal(false);
-                        }
-                    }}
-                />
+                <LoadModal isOpen={showLoadModal} onClose={() => setShowLoadModal(false)} isLoading={isLoading} strategies={savedStrategies} onLoadStrategy={(strat) => { if (confirm(`Charger "${strat.name}" ?`)) { setDrawings(strat.data); setShowLoadModal(false); }}} />
             </div>
         </div>
     );
