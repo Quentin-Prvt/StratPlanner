@@ -1,10 +1,13 @@
 // src/types/canvas.ts
-import type { StrokeType } from '../components/ToolsSidebar';
 
-// Définition d'un objet dessiné
+// Définition centralisée des types
+export type ToolType = 'pen' | 'eraser' | 'cursor' | 'agent' | 'ability' | 'wall' | null;
+export type StrokeType = 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect' | 'wall';
+
 export interface DrawingObject {
     id: number;
     tool: StrokeType | 'image';
+    subtype?: 'agent' | 'ability';
     points: { x: number, y: number }[];
     color: string;
     thickness: number;
@@ -16,7 +19,6 @@ export interface DrawingObject {
     height?: number;
 }
 
-// Structure de la BDD Supabase
 export interface StrategyRecord {
     id: string;
     name: string;

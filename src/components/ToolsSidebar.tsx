@@ -4,8 +4,7 @@ import {
     Hand, Save, FolderOpen, MousePointer2
 } from 'lucide-react';
 
-export type ToolType = 'pen' | 'eraser' | 'cursor' | 'agent' | null;
-export type StrokeType = 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect';
+import type { ToolType, StrokeType } from '../types/canvas';
 
 interface ToolsSidebarProps {
     currentTool: ToolType;
@@ -40,7 +39,6 @@ export const ToolsSidebar = ({
         '#8b5cf6', '#713f12'
     ];
 
-    // Liste des agents
     const agents = [
         'astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock',
         'fade', 'gekko', 'harbor', 'iso', 'jett', 'kayo', 'killjoy', 'neon',
@@ -48,26 +46,28 @@ export const ToolsSidebar = ({
         'vyse', 'yoru'
     ];
 
+    const abilities = ['c', 'q', 'e', 'x'];
+
     const handleToolClick = (tool: ToolType) => {
-        if (currentTool === tool) {
-            setTool(null);
-        } else {
-            setTool(tool);
-        }
+        if (currentTool === tool) setTool(null);
+        else setTool(tool);
     };
 
-    const handleDragStart = (e: React.DragEvent, agentName: string) => {
-        e.dataTransfer.setData("agent", agentName);
+    const handleDragStart = (e: React.DragEvent, type: 'agent' | 'ability', name: string) => {
+        const dragData = JSON.stringify({ type, name });
+        e.dataTransfer.setData("application/json", dragData);
         e.dataTransfer.effectAllowed = "copy";
-        setSelectedAgent(agentName);
-        if (currentTool !== 'agent' && currentTool !== 'cursor') {
+
+        if (type === 'agent') {
+            setSelectedAgent(name);
             setTool('agent');
+        } else {
+            setTool('ability');
         }
     };
 
     return (
         <div className="flex flex-col gap-4 p-4 bg-[#1e293b] rounded-xl border border-gray-700 shadow-xl w-full lg:w-72 text-white overflow-y-auto max-h-full pointer-events-auto">
-            {/* Header + Actions */}
             <div className="flex justify-between items-center mb-1">
                 <h2 className="text-xl font-bold">Outils</h2>
                 <div className="flex gap-2">
@@ -76,7 +76,6 @@ export const ToolsSidebar = ({
                 </div>
             </div>
 
-            {/* Outils Principaux */}
             <div className="grid grid-cols-4 gap-2 mb-2">
                 <ToolButton active={currentTool === 'cursor'} onClick={() => handleToolClick('cursor')} icon={<MousePointer2 size={20} />} title="Déplacer" />
                 <ToolButton active={currentTool === 'pen'} onClick={() => handleToolClick('pen')} icon={<Pencil size={20} />} title="Dessiner" />
@@ -84,7 +83,6 @@ export const ToolsSidebar = ({
                 <ToolButton active={currentTool === 'agent'} onClick={() => handleToolClick('agent')} icon={<span className="font-bold text-lg">A</span>} title="Placer Agent" />
             </div>
 
-            {/* Message Mode Navigation */}
             {currentTool === null && (
                 <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-3 flex items-center gap-3 text-sm text-blue-200">
                     <Hand size={18} />
@@ -92,23 +90,43 @@ export const ToolsSidebar = ({
                 </div>
             )}
 
-            {/* Liste des Agents */}
             <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-300">
-                <span className="text-sm font-medium text-gray-400">Agents (Glisser-Déposer)</span>
-                <div className="grid grid-cols-4 gap-2 bg-slate-800 p-3 rounded-lg border border-slate-700 max-h-60 overflow-y-auto custom-scrollbar">
+                <span className="text-sm font-medium text-gray-400">Compétences ({selectedAgent})</span>
+                <div className="grid grid-cols-4 gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
+                    {abilities.map(key => (
+                        <div
+                            key={key}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, 'ability', `${selectedAgent}_${key}`)}
+                            className="aspect-square p-1 rounded-md border border-slate-600 hover:border-white hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-all flex items-center justify-center relative group"
+                            title={`Compétence ${key.toUpperCase()}`}
+                        >
+                            <img
+                                src={`/abilities/${selectedAgent}_${key}_icon.png`}
+                                alt={key}
+                                className="w-full h-full object-contain pointer-events-none"
+                                onError={(e) => {e.currentTarget.src = 'https://placehold.co/40x40/black/white?text=?'}}
+                            />
+                            <span className="absolute bottom-0 right-0 bg-black/70 text-[10px] px-1 rounded text-white font-mono">{key.toUpperCase()}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-2 flex-1 min-h-0">
+                <span className="text-sm font-medium text-gray-400">Agents</span>
+                <div className="grid grid-cols-4 gap-2 bg-slate-800 p-3 rounded-lg border border-slate-700 overflow-y-auto custom-scrollbar">
                     {agents.map(agent => (
                         <div
                             key={agent}
                             draggable
-                            onDragStart={(e) => handleDragStart(e, agent)}
+                            onDragStart={(e) => handleDragStart(e, 'agent', agent)}
                             onClick={() => { setSelectedAgent(agent); setTool('agent'); }}
-                            // --- MODIFICATION ICI : Style des bordures ---
                             className={`aspect-square p-1 rounded-md border-2 cursor-grab active:cursor-grabbing transition-all ${
-                                selectedAgent === agent && currentTool === 'agent'
-                                    ? 'border-[#ff4655] bg-slate-700' // Sélectionné : Rouge
-                                    : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700' // Défaut : Gris
+                                selectedAgent === agent
+                                    ? 'border-[#ff4655] bg-slate-700'
+                                    : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700'
                             }`}
-                            title={agent}
                         >
                             <img
                                 src={`/agents/${agent}.png`}
@@ -121,7 +139,6 @@ export const ToolsSidebar = ({
                 </div>
             </div>
 
-            {/* Options du Stylo */}
             {currentTool === 'pen' && (
                 <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-300 mt-2 pt-4 border-t border-gray-700">
                     <div className="flex items-center gap-3">
@@ -139,33 +156,18 @@ export const ToolsSidebar = ({
                         <span className="text-sm font-medium w-16 pt-1">Couleur</span>
                         <div className="flex flex-wrap gap-2 flex-1">
                             {colors.map((c) => (
-                                <button
-                                    key={c}
-                                    onClick={() => setColor(c)}
-                                    className={`w-6 h-6 rounded border transition-transform hover:scale-110 ${color === c ? 'border-white ring-2 ring-blue-500' : 'border-transparent'}`}
-                                    style={{ backgroundColor: c }}
-                                />
+                                <button key={c} onClick={() => setColor(c)} className={`w-6 h-6 rounded border transition-transform hover:scale-110 ${color === c ? 'border-white ring-2 ring-blue-500' : 'border-transparent'}`} style={{ backgroundColor: c }} />
                             ))}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-medium w-16">Opacité</span>
-                        <input
-                            type="range" min="0.1" max="1" step="0.1"
-                            value={opacity}
-                            onChange={(e) => setOpacity(parseFloat(e.target.value))}
-                            className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]"
-                        />
+                        <input type="range" min="0.1" max="1" step="0.1" value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]" />
                     </div>
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-medium w-16">Taille</span>
-                        <input
-                            type="range" min="2" max="20"
-                            value={thickness}
-                            onChange={(e) => setThickness(parseInt(e.target.value))}
-                            className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]"
-                        />
+                        <input type="range" min="2" max="20" value={thickness} onChange={(e) => setThickness(parseInt(e.target.value))} className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]" />
                     </div>
                 </div>
             )}
