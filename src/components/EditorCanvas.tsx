@@ -2,20 +2,26 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ToolsSidebar } from './ToolsSidebar';
 import { LoadModal } from './LoadModal';
 import { useSupabaseStrategies } from '../hooks/useSupabase';
-import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing';
+import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing'; // Pour le tracé en cours (stylo)
 import type { DrawingObject, ToolType, StrokeType } from '../types/canvas';
 
-// --- IMPORTS DES UTILITAIRES ABILITIES ---
-import { drawBreachStun, checkBreachStunHit, updateBreachStunPosition } from '../utils/abilities/breachStun';
-import { drawAstraWall, checkAstraWallHit, updateAstraWallPosition } from '../utils/abilities/astraWall';
-import { drawBreachUlt, checkBreachUltHit, updateBreachUltPosition } from '../utils/abilities/breachUlt';
-import { drawBreachAftershock, checkBreachAftershockHit, updateBreachAftershockPosition } from '../utils/abilities/breachAftershock';
-import { drawBrimstoneStim, checkBrimstoneStimHit, updateBrimstoneStimPosition } from '../utils/abilities/brimstoneStim';
-import { drawChamberTrademark, checkChamberTrademarkHit, updateChamberTrademarkPosition } from '../utils/abilities/chamberTrademark';
-import { drawBrimstoneUlt, checkBrimstoneUltHit, updateBrimstoneUltPosition } from '../utils/abilities/brimstoneUlt';
-import { drawChamberRendezvous, checkChamberRendezvousHit, updateChamberRendezvousPosition } from '../utils/abilities/chamberRendezvous';
+// --- IMPORTS OPTIMISÉS ---
+import { renderDrawings } from '../utils/canvasRenderer';
+import { createDrawingFromDrop } from '../utils/dropFactory';
 
-import { ABILITY_SIZES } from '../utils/abilitySizes';
+// --- LOGIQUE DE DÉPLACEMENT DES ABILITÉS ---
+import { checkBreachStunHit, updateBreachStunPosition } from '../utils/abilities/breachStun';
+import { checkAstraWallHit, updateAstraWallPosition } from '../utils/abilities/astraWall';
+import { checkBreachUltHit, updateBreachUltPosition } from '../utils/abilities/breachUlt';
+import { checkBreachAftershockHit, updateBreachAftershockPosition } from '../utils/abilities/breachAftershock';
+import { checkBrimstoneStimHit, updateBrimstoneStimPosition } from '../utils/abilities/brimstoneStim';
+import { checkBrimstoneUltHit, updateBrimstoneUltPosition } from '../utils/abilities/brimstoneUlt';
+import { checkChamberTrademarkHit, updateChamberTrademarkPosition } from '../utils/abilities/chamberTrademark';
+import { checkChamberRendezvousHit, updateChamberRendezvousPosition } from '../utils/abilities/chamberRendezvous';
+import { checkCypherTrapwireHit, updateCypherTrapwirePosition } from '../utils/abilities/cypherTrapwire';
+import { checkCypherCageHit, updateCypherCagePosition } from '../utils/abilities/cypherCage';
+import { checkDeadlockWallHit, updateDeadlockWallPosition } from '../utils/abilities/deadlockWall';
+import { checkDeadlockSensorHit, updateDeadlockSensorPosition } from '../utils/abilities/deadlockSensor';
 
 interface EditorCanvasProps {
     mapSrc: string;
@@ -46,27 +52,14 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
 
     const [isDrawing, setIsDrawing] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
-
-    // Gestion du déplacement
     const [draggingObjectId, setDraggingObjectId] = useState<number | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-    // Gestion Drag Spécial
-    const [specialDragMode, setSpecialDragMode] = useState<'center' | 'handle' | null>(null);
+    // Drag mode spécial pour les objets complexes (p1, p2, center, body...)
+    const [specialDragMode, setSpecialDragMode] = useState<string | null>(null);
     const [wallCenterStart, setWallCenterStart] = useState({ x: 0, y: 0 });
 
     const { savedStrategies, isLoading, showLoadModal, setShowLoadModal, saveStrategy, fetchStrategies } = useSupabaseStrategies('Ascent');
-
-    // --- CHARGEMENT D'IMAGES ---
-    const getOrLoadImage = (src: string, isAbility: boolean = false): HTMLImageElement | null => {
-        if (imageCache.current.has(src)) return imageCache.current.get(src) || null;
-        const img = new Image();
-        const folder = isAbility ? '/abilities/' : '/agents/';
-        img.src = `${folder}${src}.png`;
-        img.onload = () => redrawMainCanvas();
-        imageCache.current.set(src, img);
-        return img;
-    };
 
     const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         const canvas = canvasRef.current;
@@ -80,99 +73,8 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        drawings.forEach(obj => {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.globalAlpha = obj.opacity;
-
-            // --- ABILITIES SPECIALES VECTORIELLES ---
-            if (obj.tool === 'stun_zone') { drawBreachStun(ctx, obj); return; }
-            if (obj.tool === 'breach_x_zone') { drawBreachUlt(ctx, obj); return; }
-            if (obj.tool === 'breach_c_zone') { drawBreachAftershock(ctx, obj); return; }
-            if (obj.tool === 'wall') { drawAstraWall(ctx, obj); return; }
-            if (obj.tool === 'brimstone_c_zone') { drawBrimstoneStim(ctx, obj, imageCache.current, redrawMainCanvas); return; }
-            if (obj.tool === 'chamber_c_zone') {
-                drawChamberTrademark(ctx, obj, imageCache.current, redrawMainCanvas);
-                return;
-            }
-            if (obj.tool === 'chamber_e_zone') {
-                drawChamberRendezvous(ctx, obj, imageCache.current, redrawMainCanvas);
-                return;
-            }
-            if (obj.tool === 'brimstone_x_zone') {
-                drawBrimstoneUlt(ctx, obj);
-                return;
-            }
-
-            // --- IMAGES CLASSIQUES (Inclut Brimstone E/Q) ---
-            if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
-                const isAbility = obj.subtype === 'ability' || obj.imageSrc.includes('_game') || obj.imageSrc.includes('_icon');
-
-                //  On définit quels sorts doivent avoir le style "Icône avec cadre"
-                const isIconStyle = [
-                    'breach_q',
-                    'chamber_q',
-                    'chamber_x'
-                ].some(key => obj.imageSrc?.includes(key));
-
-                const img = getOrLoadImage(obj.imageSrc, isAbility);
-
-                // Sécurité pour éviter le crash "broken state"
-                if (img && img.complete && img.naturalWidth > 0) {
-                    const targetSize = obj.width || 50;
-                    const boxW = targetSize; const boxH = targetSize;
-                    const naturalRatio = img.naturalWidth / img.naturalHeight;
-                    let drawW = boxW; let drawH = boxH;
-                    if (naturalRatio > 1) drawH = boxW / naturalRatio; else drawW = boxH * naturalRatio;
-                    const centerX = obj.x; const centerY = obj.y;
-                    const drawX = centerX - drawW / 2; const drawY = centerY - drawH / 2;
-
-                    ctx.save();
-
-                    // Condition de rendu :
-                    // Si c'est une compétence ET que ce N'EST PAS un style icône -> Dessin transparent (Smoke, Mollo...)
-                    if (isAbility && !isIconStyle) {
-                        ctx.drawImage(img, drawX, drawY, drawW, drawH);
-                    } else {
-                        // Sinon (Agent, Breach Flash, Chamber Q/X) -> Dessin avec Cadre
-                        const frameX = centerX - boxW/2; const frameY = centerY - boxH/2; const borderRadius = 6;
-                        ctx.beginPath();
-                        if (typeof ctx.roundRect === 'function') ctx.roundRect(frameX, frameY, boxW, boxH, borderRadius); else ctx.rect(frameX, frameY, boxW, boxH);
-                        ctx.fillStyle = '#1e293b'; ctx.fill();
-
-                        ctx.save();
-                        ctx.clip();
-                        ctx.drawImage(img, drawX, drawY, drawW, drawH);
-                        ctx.restore();
-
-                        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2; ctx.shadowColor = '#cbd5e1'; ctx.shadowBlur = 15; ctx.stroke();
-                    }
-                    ctx.restore();
-
-                    // Cadre de sélection (vert)
-                    if (draggingObjectId === obj.id) {
-                        ctx.save(); ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.shadowBlur = 0;
-                        ctx.strokeRect(centerX - boxW/2 - 2, centerY - boxH/2 - 2, boxW + 4, boxH + 4);
-                        ctx.restore();
-                    }
-                }
-                return;
-            }
-
-            // --- DESSIN VECTORIEL ---
-            ctx.strokeStyle = obj.color; ctx.lineWidth = obj.thickness; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            if (obj.tool === 'dashed' || obj.tool === 'dashed-arrow') ctx.setLineDash([obj.thickness * 2, obj.thickness * 2]); else ctx.setLineDash([]);
-            if (obj.tool === 'rect') {
-                const start = obj.points[0]; const end = obj.points[1]; ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
-            } else {
-                drawSmoothLine(ctx, obj.points);
-                if ((obj.tool === 'arrow' || obj.tool === 'dashed-arrow') && obj.points.length > 2) {
-                    const last = obj.points[obj.points.length - 1]; const prevIndex = Math.max(0, pointsRef.current.length - 5); const prev = pointsRef.current[prevIndex];
-                    if(prev && last) drawArrowHead(ctx, prev.x, prev.y, last.x, last.y, obj.thickness);
-                }
-            }
-        });
+        // On utilise le renderer externalisé
+        renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId);
     }, [drawings, draggingObjectId]);
 
     useEffect(() => { redrawMainCanvas(); }, [drawings, redrawMainCanvas, draggingObjectId]);
@@ -192,69 +94,13 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             const finalX = (mouseX - x) / scale;
             const finalY = (mouseY - y) / scale;
 
-            // ASTRA / BREACH VECTORIELS
-            if (name === 'astra_x') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'wall', subtype: 'ability', points: [{x: finalX - 100, y: finalY}, {x: finalX + 100, y: finalY}], color: '#bd00ff', thickness: 6, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
-            if (name === 'breach_e') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'stun_zone', subtype: 'ability', points: [{x: finalX, y: finalY}, {x: finalX, y: finalY - 200}], color: '#eab308', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
-            if (name === 'breach_x') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'breach_x_zone', subtype: 'ability', points: [{x: finalX, y: finalY}, {x: finalX, y: finalY - 850}], color: '#ef4444', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
-            if (name === 'breach_c') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'breach_c_zone', subtype: 'ability', points: [{x: finalX, y: finalY}, {x: finalX, y: finalY - 150}], color: '#f59e0b', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
+            // On utilise la factory externalisée
+            const newObj = createDrawingFromDrop(type, name, finalX, finalY);
 
-            // BRIMSTONE VECTORIELS
-            if (name === 'brimstone_c') { setDrawings(prev => [...prev, { id: Date.now(), tool: 'brimstone_c_zone', subtype: 'ability', points: [{x: finalX, y: finalY}], color: '#f97316', thickness: 0, opacity: 0.8 }]); setCurrentTool('cursor'); return; }
-            if (name === 'brimstone_x') {
-                setDrawings(prev => [...prev, {
-                    id: Date.now(), tool: 'brimstone_x_zone', subtype: 'ability',
-                    points: [{x: finalX, y: finalY}], // Un seul point : le centre
-                    color: '#ff4500', thickness: 0, opacity: 0.8
-                }]);
-                setCurrentTool('cursor'); return;
+            if (newObj) {
+                setDrawings(prev => [...prev, newObj]);
+                setCurrentTool('cursor');
             }
-            if (name === 'chamber_e') {
-                setDrawings(prev => [...prev, {
-                    id: Date.now(), tool: 'chamber_e_zone', subtype: 'ability',
-                    points: [{x: finalX, y: finalY}],
-                    color: '#facc15', thickness: 0, opacity: 0.8
-                }]);
-                setCurrentTool('cursor'); return;
-            }
-            if (name === 'chamber_c') {
-                setDrawings(prev => [...prev, {
-                    id: Date.now(), tool: 'chamber_c_zone', subtype: 'ability',
-                    points: [{x: finalX, y: finalY}],
-                    color: '#eab308', thickness: 0, opacity: 0.8
-                }]);
-                setCurrentTool('cursor'); return;
-            }
-
-            // --- GESTION GÉNÉRIQUE (IMAGES) ---
-            // Liste des sorts qui utilisent l'image "_icon" (au lieu de "_game")
-            const useIconFile = ['breach_q', 'chamber_q', 'chamber_x'];
-
-
-            const suffix = useIconFile.includes(name) ? '_icon' : '_game';
-            const finalImageSrc = type === 'ability' ? `${name}${suffix}` : name;
-
-            //  Taille et Opacité
-            let size = type === 'ability' ? 80 : 50;
-            if (ABILITY_SIZES[name]) { size = ABILITY_SIZES[name]; }
-
-            // Opacité 0.8 pour les compétences, 1 pour les agents
-            const defaultOpacity = type === 'ability' ? 0.8 : 1;
-
-            setDrawings(prev => [...prev, {
-                id: Date.now(),
-                tool: 'image',
-                subtype: type,
-                points: [],
-                color: '#fff',
-                thickness: 0,
-                opacity: defaultOpacity,
-                imageSrc: finalImageSrc,
-                x: finalX,
-                y: finalY,
-                width: size,
-                height: size
-            }]);
-            setCurrentTool('cursor');
         } catch (err) { console.error("Drop error", err); }
     };
 
@@ -270,21 +116,32 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1) { setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY }; if(containerRef.current) containerRef.current.style.cursor = 'grabbing'; e.preventDefault(); return; }
+        if (e.button === 1) {
+            setIsPanning(true);
+            panStartRef.current = { x: e.clientX, y: e.clientY };
+            if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
+            e.preventDefault();
+            return;
+        }
+
         const pos = getMousePos(e);
 
         if (currentTool === 'cursor') {
+            // Parcours inverse pour sélectionner l'objet le plus au-dessus
             for (let i = drawings.length - 1; i >= 0; i--) {
                 const obj = drawings[i];
 
-                // Zones spéciales vectorielles
+                // --- HIT TESTS ABILITIES ---
                 if (obj.tool === 'stun_zone') { const hit = checkBreachStunHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
                 if (obj.tool === 'breach_x_zone') { const hit = checkBreachUltHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
                 if (obj.tool === 'breach_c_zone') { const hit = checkBreachAftershockHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
                 if (obj.tool === 'wall') { const hit = checkAstraWallHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.centerStart) setWallCenterStart(hit.centerStart); if (hit.offset) setDragOffset(hit.offset); return; } }
                 if (obj.tool === 'brimstone_c_zone') { const hit = checkBrimstoneStimHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'chamber_c_zone') {
-                    const hit = checkChamberTrademarkHit(pos, obj);
+                if (obj.tool === 'brimstone_x_zone') { const hit = checkBrimstoneUltHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'chamber_c_zone') { const hit = checkChamberTrademarkHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'chamber_e_zone') { const hit = checkChamberRendezvousHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
+                if (obj.tool === 'cypher_c_wire') {
+                    const hit = checkCypherTrapwireHit(pos, obj);
                     if (hit) {
                         setDraggingObjectId(obj.id);
                         setSpecialDragMode(hit.mode);
@@ -292,8 +149,8 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                         return;
                     }
                 }
-                if (obj.tool === 'chamber_e_zone') {
-                    const hit = checkChamberRendezvousHit(pos, obj);
+                if (obj.tool === 'deadlock_q_sensor') {
+                    const hit = checkDeadlockSensorHit(pos, obj);
                     if (hit) {
                         setDraggingObjectId(obj.id);
                         setSpecialDragMode(hit.mode);
@@ -301,15 +158,27 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                         return;
                     }
                 }
-                if (obj.tool === 'brimstone_x_zone') {
-                    const hit = checkBrimstoneUltHit(pos, obj);
+                if (obj.tool === 'cypher_q_zone') {
+                    const hit = checkCypherCageHit(pos, obj);
                     if (hit) {
-                        setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset); return;
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool === 'deadlock_c_wall') {
+                    const hit = checkDeadlockWallHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+
+                        setSpecialDragMode(hit.mode.toString());
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
                     }
                 }
 
-                // Images classiques
+                // --- HIT TEST IMAGES ---
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = obj.width || 50; const h = obj.height || 50;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
@@ -321,7 +190,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             return;
         }
 
-        // Pen/Eraser
+        // Logic Pen/Eraser
         if (currentTool === 'agent') {
             const newAgent: DrawingObject = { id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: 50, height: 50 };
             setDrawings(prev => [...prev, newAgent]); return;
@@ -331,20 +200,38 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (isPanning) { e.preventDefault(); const dx = e.clientX - panStartRef.current.x; const dy = e.clientY - panStartRef.current.y; const { x, y, scale } = transformRef.current; transformRef.current = { scale, x: x + dx, y: y + dy }; updateTransformStyle(); panStartRef.current = { x: e.clientX, y: e.clientY }; return; }
+        if (isPanning) {
+            e.preventDefault();
+            const dx = e.clientX - panStartRef.current.x;
+            const dy = e.clientY - panStartRef.current.y;
+            const { x, y, scale } = transformRef.current;
+            transformRef.current = { scale, x: x + dx, y: y + dy };
+            updateTransformStyle();
+            panStartRef.current = { x: e.clientX, y: e.clientY };
+            return;
+        }
         const pos = getMousePos(e);
 
         if (draggingObjectId !== null && specialDragMode) {
             setDrawings(prev => prev.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
-                if (obj.tool === 'stun_zone') return updateBreachStunPosition(obj, pos, specialDragMode, dragOffset);
-                if (obj.tool === 'breach_x_zone') return updateBreachUltPosition(obj, pos, specialDragMode, dragOffset);
-                if (obj.tool === 'breach_c_zone') return updateBreachAftershockPosition(obj, pos, specialDragMode, dragOffset);
-                if (obj.tool === 'wall') return updateAstraWallPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart);
+                // --- UPDATES ABILITIES ---
+                if (obj.tool === 'stun_zone') return updateBreachStunPosition(obj, pos, specialDragMode as any, dragOffset);
+                if (obj.tool === 'breach_x_zone') return updateBreachUltPosition(obj, pos, specialDragMode as any, dragOffset);
+                if (obj.tool === 'breach_c_zone') return updateBreachAftershockPosition(obj, pos, specialDragMode as any, dragOffset);
+                if (obj.tool === 'wall') return updateAstraWallPosition(obj, pos, specialDragMode as any, dragOffset, wallCenterStart);
                 if (obj.tool === 'brimstone_c_zone') return updateBrimstoneStimPosition(obj, pos, dragOffset);
+                if (obj.tool === 'brimstone_x_zone') return updateBrimstoneUltPosition(obj, pos, dragOffset);
                 if (obj.tool === 'chamber_c_zone') return updateChamberTrademarkPosition(obj, pos, dragOffset);
                 if (obj.tool === 'chamber_e_zone') return updateChamberRendezvousPosition(obj, pos, dragOffset);
-                if (obj.tool === 'brimstone_x_zone') return updateBrimstoneUltPosition(obj, pos, dragOffset);
+                if (obj.tool === 'cypher_q_zone') return updateCypherCagePosition(obj, pos, dragOffset);
+                if (obj.tool === 'cypher_c_wire') return updateCypherTrapwirePosition(obj, pos, specialDragMode as 'handle'|'body', dragOffset);
+                if (obj.tool === 'deadlock_c_wall') {
+                    const pointIndex = parseInt(specialDragMode as string, 10);
+                    return updateDeadlockWallPosition(obj, pos, pointIndex, dragOffset);
+                }
+                if (obj.tool === 'deadlock_q_sensor') return updateDeadlockSensorPosition(obj, pos, specialDragMode as 'center'|'rotate', dragOffset);
+
                 return obj;
             }));
             return;
@@ -352,9 +239,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
 
         if (draggingObjectId !== null && !specialDragMode) {
             setDrawings(prev => prev.map(obj => {
-                if (obj.id === draggingObjectId && obj.tool === 'image') {
-                    return { ...obj, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
-                }
+                if (obj.id === draggingObjectId && obj.tool === 'image') { return { ...obj, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }; }
                 return obj;
             }));
             return;
@@ -362,31 +247,92 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
 
         if (!isDrawing) return;
         if (currentTool === 'eraser') { eraseObjectAt(pos.x, pos.y); return; }
-        if (currentTool === 'pen') { pointsRef.current.push(pos); const tempCtx = getContext(tempCanvasRef); if (!tempCtx || !tempCanvasRef.current) return; tempCtx.clearRect(0, 0, tempCanvasRef.current.width, tempCtx.canvas.height); tempCtx.strokeStyle = color; tempCtx.lineWidth = thickness; tempCtx.lineCap = 'round'; tempCtx.lineJoin = 'round'; tempCtx.globalAlpha = opacity; if (strokeType === 'dashed' || strokeType === 'dashed-arrow') { tempCtx.setLineDash([thickness * 2, thickness * 2]); } else { tempCtx.setLineDash([]); } if (strokeType === 'rect') { tempCtx.strokeRect(startPosRef.current.x, startPosRef.current.y, pos.x - startPosRef.current.x, pos.y - startPosRef.current.y); } else { drawSmoothLine(tempCtx, pointsRef.current); if ((strokeType === 'arrow' || strokeType === 'dashed-arrow') && pointsRef.current.length > 2) { const last = pointsRef.current[pointsRef.current.length - 1]; const prevIndex = Math.max(0, pointsRef.current.length - 5); const prev = pointsRef.current[prevIndex]; if(prev && last) drawArrowHead(tempCtx, prev.x, prev.y, last.x, last.y, thickness); } } }
+        // Dessin temporaire Pen/Shape
+        if (currentTool === 'pen') {
+            pointsRef.current.push(pos);
+            const tempCtx = getContext(tempCanvasRef);
+            if (!tempCtx || !tempCanvasRef.current) return;
+            tempCtx.clearRect(0, 0, tempCanvasRef.current.width, tempCtx.canvas.height);
+            tempCtx.strokeStyle = color;
+            tempCtx.lineWidth = thickness;
+            tempCtx.lineCap = 'round';
+            tempCtx.lineJoin = 'round';
+            tempCtx.globalAlpha = opacity;
+            if (strokeType === 'dashed' || strokeType === 'dashed-arrow') { tempCtx.setLineDash([thickness * 2, thickness * 2]); } else { tempCtx.setLineDash([]); }
+            if (strokeType === 'rect') {
+                tempCtx.strokeRect(startPosRef.current.x, startPosRef.current.y, pos.x - startPosRef.current.x, pos.y - startPosRef.current.y);
+            } else {
+                drawSmoothLine(tempCtx, pointsRef.current);
+                if ((strokeType === 'arrow' || strokeType === 'dashed-arrow') && pointsRef.current.length > 2) {
+                    const last = pointsRef.current[pointsRef.current.length - 1];
+                    const prev = pointsRef.current[Math.max(0, pointsRef.current.length - 5)];
+                    if(prev && last) drawArrowHead(tempCtx, prev.x, prev.y, last.x, last.y, thickness);
+                }
+            }
+        }
     };
 
     const handleMouseUp = () => {
-        if (isPanning) { setIsPanning(false); if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab'); return; }
-        setDraggingObjectId(null); setSpecialDragMode(null); setDragOffset({ x: 0, y: 0 });
-        if (isDrawing) { setIsDrawing(false); if (currentTool === 'pen') { const newDrawing: DrawingObject = { id: Date.now(), tool: strokeType, points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current], color: color, thickness: thickness, opacity: opacity }; setDrawings(prev => [...prev, newDrawing]); const tempCtx = getContext(tempCanvasRef); if (tempCtx && tempCtx.canvas.width > 0 && tempCtx.canvas.height > 0) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height); } pointsRef.current = []; }
+        if (isPanning) {
+            setIsPanning(false);
+            if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab');
+            return;
+        }
+        setDraggingObjectId(null);
+        setSpecialDragMode(null);
+        setDragOffset({ x: 0, y: 0 });
+
+        if (isDrawing) {
+            setIsDrawing(false);
+            if (currentTool === 'pen') {
+                const newDrawing: DrawingObject = {
+                    id: Date.now(),
+                    tool: strokeType,
+                    points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current],
+                    color: color,
+                    thickness: thickness,
+                    opacity: opacity
+                };
+                setDrawings(prev => [...prev, newDrawing]);
+                const tempCtx = getContext(tempCanvasRef);
+                if (tempCtx && tempCtx.canvas.width > 0 && tempCtx.canvas.height > 0) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+            }
+            pointsRef.current = [];
+        }
     };
 
     const eraseObjectAt = (x: number, y: number) => {
         const hitThreshold = 10;
         const newDrawings = drawings.filter(obj => {
-            // Gomme pour images
+            // Gomme Image
             if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); }
 
-            // Gomme pour zones spéciales (multipoints)
-            if (obj.tool === 'wall' || obj.tool === 'stun_zone' || obj.tool === 'breach_x_zone' || obj.tool === 'breach_c_zone') { const p1 = obj.points[0]; const p2 = obj.points[1]; const midX = (p1.x + p2.x)/2; const midY = (p1.y + p2.y)/2; return Math.hypot(x - p1.x, y - p1.y) > 20 && Math.hypot(x - p2.x, y - p2.y) > 20 && Math.hypot(x - midX, y - midY) > 20; }
+            // Gomme Multi-points (Wall, Stun, Ult Breach, Aftershock, Trapwire Cypher)
+            if (obj.tool === 'wall' || obj.tool === 'stun_zone' || obj.tool === 'breach_x_zone' || obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor') {
+                const p1 = obj.points[0]; const p2 = obj.points[1];
+                if (obj.tool === 'deadlock_c_wall') {
+                    return Math.hypot(x - p1.x, y - p1.y) > 30;
+                }
+                const midX = (p1.x + p2.x)/2; const midY = (p1.y + p2.y)/2;
+                return Math.hypot(x - p1.x, y - p1.y) > 20 && Math.hypot(x - p2.x, y - p2.y) > 20 && Math.hypot(x - midX, y - midY) > 20;
+            }
 
-
-            // Gomme pour zones spéciales
-            if (obj.tool === 'brimstone_c_zone' || obj.tool === 'brimstone_x_zone' || obj.tool === 'chamber_c_zone' || obj.tool === 'chamber_e_zone') {
+            // Gomme Circulaire (Brimstone, Chamber, etc.)
+            if (['brimstone_c_zone', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone'].includes(obj.tool as string)) {
                 const center = obj.points[0];
                 return Math.hypot(x - center.x, y - center.y) > 25;
             }
-            if (obj.tool === 'rect' && obj.points.length >= 2) { const s = obj.points[0]; const e = obj.points[1]; const minX = Math.min(s.x, e.x) - hitThreshold; const maxX = Math.max(s.x, e.x) + hitThreshold; const minY = Math.min(s.y, e.y) - hitThreshold; const maxY = Math.max(s.y, e.y) + hitThreshold; return !(x >= minX && x <= maxX && y >= minY && y <= maxY); } const isHit = obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + hitThreshold)); return !isHit;
+
+
+            // Gomme Traits Standards
+            if (obj.tool === 'rect' && obj.points.length >= 2) {
+                const s = obj.points[0]; const e = obj.points[1];
+                const minX = Math.min(s.x, e.x) - hitThreshold; const maxX = Math.max(s.x, e.x) + hitThreshold;
+                const minY = Math.min(s.y, e.y) - hitThreshold; const maxY = Math.max(s.y, e.y) + hitThreshold;
+                return !(x >= minX && x <= maxX && y >= minY && y <= maxY);
+            }
+            const isHit = obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + hitThreshold));
+            return !isHit;
         });
         if (newDrawings.length !== drawings.length) setDrawings(newDrawings);
     };

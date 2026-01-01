@@ -1,8 +1,14 @@
 
 export type ToolType = 'pen' | 'eraser' | 'cursor' | 'agent' | 'ability' | 'wall' | null;
 
-export type StrokeType = 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect' | 'wall' | 'stun_zone' | 'breach_x_zone' | 'breach_c_zone' | 'brimstone_c_zone' | 'brimstone_x_zone' | 'chamber_c_zone' | 'chamber_e_zone';
-
+export type StrokeType =
+    | 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect'
+    | 'wall' // Astra
+    | 'stun_zone' | 'breach_x_zone' | 'breach_c_zone' // Breach
+    | 'brimstone_c_zone' | 'brimstone_x_zone' // Brimstone
+    | 'chamber_c_zone' | 'chamber_e_zone' // Chamber
+    | 'cypher_c_wire'| 'cypher_q_zone'// Cypher
+    | 'deadlock_c_wall'| 'deadlock_q_sensor'; // Deadlock
 
 export interface DrawingObject {
     id: number;
