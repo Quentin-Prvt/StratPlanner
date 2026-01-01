@@ -86,10 +86,49 @@ export const createDrawingFromDrop = (
             opacity: 0.8
         };
     }
+    if (name === 'fade_x') {
+        const length = 470;
+        return {
+            id,
+            tool: 'fade_x_zone',
+            subtype: 'ability',
+            points: [
+                { x, y },
+                { x: x + length, y }
+            ],
+            color: '#6366f1',
+            thickness: 0,
+            opacity: 0.8
+        };
+    }
+    if (name === 'fade_q') {
+        return {
+            id,
+            tool: 'fade_q_zone',
+            subtype: 'ability',
+            points: [{ x, y }],
+            color: '#6366f1',
+            thickness: 0,
+            opacity: 0.8,
+            imageSrc: 'fade_q_icon'
+        };
+    }
+    if (name === 'fade_e') {
+        return {
+            id,
+            tool: 'fade_e_zone',
+            subtype: 'ability',
+            points: [{ x, y }],
+            color: '#818cf8',
+            thickness: 0,
+            opacity: 0.8,
+            imageSrc: 'fade_e_icon'
+        };
+    }
     // --- 5. IMAGES GÉNÉRIQUES (Agents, Smokes, Mollys, Icons) ---
 
     // Liste des sorts qui utilisent l'image "_icon"
-    const useIconFile = ['breach_q', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x'];
+    const useIconFile = ['breach_q', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x', 'fade_c'];
 
     const suffix = useIconFile.includes(name) ? '_icon' : '_game';
     const finalImageSrc = type === 'ability' ? `${name}${suffix}` : name;

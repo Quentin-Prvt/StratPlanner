@@ -26,7 +26,7 @@ export const ABILITY_SIZES: Record<string, number> = {
     'clove_q': 130, // Zone de decay (Meddle)
     'clove_e': 140, // Smoke (Ruse) - Similaire à Brimstone
 
-    //Cypher
+    // CYPHER
     'cypher_c_max_length': 200, // Longueur max du fil
     'cypher_c_box_size': 14, // Taille des carrés aux extrémités
     'cypher_q_radius': 60,
@@ -41,5 +41,14 @@ export const ABILITY_SIZES: Record<string, number> = {
     'deadlock_q_width': 80,  // Largeur de la zone
     'deadlock_q_icon_size': 20, // Taille du petit capteur
     'deadlock_x': 30,
+
+    // FADE
+    'fade_c': 30,           // Prowler
+    'fade_x_width': 250,    // Largeur Ult
+    'fade_x_length': 470,   // Longueur Ult
+    'fade_q_radius': 75,      // Taille de la zone indigo
+    'fade_q_icon_size': 30,    // Taille de l'icône au centre
+    'fade_e_radius': 333,      // Zone de détection plus large
+    'fade_e_icon_size': 30,    // Icône légèrement plus grande
 
 };

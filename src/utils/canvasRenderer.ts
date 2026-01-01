@@ -14,6 +14,9 @@ import { drawCypherTrapwire } from './abilities/cypherTrapwire';
 import { drawCypherCage } from './abilities/cypherCage';
 import { drawDeadlockWall } from './abilities/deadlockWall';
 import { drawDeadlockSensor } from './abilities/deadlockSensor';
+import { drawFadeUlt } from './abilities/fadeUlt.ts';
+import { drawFadeSeize } from './abilities/fadeSeize';
+import { drawFadeHaunt } from "./abilities/fadeHaunt.ts";
 
 /**
  * Fonction principale qui dessine tout sur le canvas
@@ -53,6 +56,12 @@ export const renderDrawings = (
         // Deadlock
         if (obj.tool === 'deadlock_c_wall') { drawDeadlockWall(ctx, obj); return; }
         if (obj.tool === 'deadlock_q_sensor') { drawDeadlockSensor(ctx, obj); return; }
+
+        // Fade
+        if (obj.tool === 'fade_x_zone') { drawFadeUlt(ctx, obj);return; }
+        if (obj.tool === 'fade_e_zone') {drawFadeHaunt(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'fade_q_zone') { drawFadeSeize(ctx, obj, imageCache, triggerRedraw);return; }
+
         // --- B. IMAGES CLASSIQUES & ICONES ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             // Détection du type pour le dossier
@@ -62,7 +71,7 @@ export const renderDrawings = (
             const isIconStyle = [
                 'breach_q',
                 'chamber_q', 'chamber_x',
-                'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x'
+                'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c'
             ].some(key => obj.imageSrc?.includes(key));
 
             // Gestion du chargement d'image

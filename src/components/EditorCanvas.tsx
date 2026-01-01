@@ -22,6 +22,10 @@ import { checkCypherTrapwireHit, updateCypherTrapwirePosition } from '../utils/a
 import { checkCypherCageHit, updateCypherCagePosition } from '../utils/abilities/cypherCage';
 import { checkDeadlockWallHit, updateDeadlockWallPosition } from '../utils/abilities/deadlockWall';
 import { checkDeadlockSensorHit, updateDeadlockSensorPosition } from '../utils/abilities/deadlockSensor';
+import { checkFadeUltHit, updateFadeUltPosition } from '../utils/abilities/fadeUlt';
+import { checkFadeSeizeHit, updateFadeSeizePosition } from '../utils/abilities/fadeSeize.ts';
+import { checkFadeHauntHit, updateFadeHauntPosition } from '../utils/abilities/fadeHaunt';
+
 
 interface EditorCanvasProps {
     mapSrc: string;
@@ -177,6 +181,9 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                         return;
                     }
                 }
+                if (obj.tool === 'fade_x_zone') {const hit = checkFadeUltHit(pos, obj);if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; }}
+                if (obj.tool === 'fade_q_zone') {const hit = checkFadeSeizeHit(pos, obj);if (hit) {setDraggingObjectId(obj.id);setSpecialDragMode(hit.mode);if (hit.offset) setDragOffset(hit.offset);return;}}
+                if (obj.tool === 'fade_e_zone') {const hit = checkFadeHauntHit(pos, obj);if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode('center'); setDragOffset(hit.offset!); return; }}
 
                 // --- HIT TEST IMAGES ---
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
@@ -231,7 +238,9 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                     return updateDeadlockWallPosition(obj, pos, pointIndex, dragOffset);
                 }
                 if (obj.tool === 'deadlock_q_sensor') return updateDeadlockSensorPosition(obj, pos, specialDragMode as 'center'|'rotate', dragOffset);
-
+                if (obj.tool === 'fade_x_zone') return updateFadeUltPosition(obj, pos, specialDragMode as any, dragOffset);
+                if (obj.tool === 'fade_q_zone') return updateFadeSeizePosition(obj, pos, dragOffset);
+                if (obj.tool === 'fade_e_zone') return updateFadeHauntPosition(obj, pos, dragOffset);
                 return obj;
             }));
             return;
@@ -308,7 +317,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); }
 
             // Gomme Multi-points (Wall, Stun, Ult Breach, Aftershock, Trapwire Cypher)
-            if (obj.tool === 'wall' || obj.tool === 'stun_zone' || obj.tool === 'breach_x_zone' || obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor') {
+            if (obj.tool === 'wall' || obj.tool === 'stun_zone' || obj.tool === 'fade_x_zone' ||obj.tool === 'breach_x_zone' || obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor') {
                 const p1 = obj.points[0]; const p2 = obj.points[1];
                 if (obj.tool === 'deadlock_c_wall') {
                     return Math.hypot(x - p1.x, y - p1.y) > 30;
@@ -317,8 +326,8 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                 return Math.hypot(x - p1.x, y - p1.y) > 20 && Math.hypot(x - p2.x, y - p2.y) > 20 && Math.hypot(x - midX, y - midY) > 20;
             }
 
-            // Gomme Circulaire (Brimstone, Chamber, etc.)
-            if (['brimstone_c_zone', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone'].includes(obj.tool as string)) {
+            // Gomme Circulaire (Brimstone, Chamber, Fade, etc.)
+            if (['brimstone_c_zone','fade_q_zone','fade_e_zone', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone'].includes(obj.tool as string)) {
                 const center = obj.points[0];
                 return Math.hypot(x - center.x, y - center.y) > 25;
             }
@@ -343,12 +352,33 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     const syncCanvasSize = useCallback(() => { const main = mainCanvasRef.current; const temp = tempCanvasRef.current; const img = imgRef.current; if (main && temp && img && img.clientWidth > 0) { main.width = img.clientWidth; main.height = img.clientHeight; temp.width = img.clientWidth; temp.height = img.clientHeight; redrawMainCanvas(); } }, [redrawMainCanvas]);
     useEffect(() => { const img = imgRef.current; if (!img) return; if (img.complete && img.naturalWidth > 0) syncCanvasSize(); const onLoad = () => syncCanvasSize(); img.addEventListener('load', onLoad); const resizeObserver = new ResizeObserver(() => syncCanvasSize()); resizeObserver.observe(img); return () => { img.removeEventListener('load', onLoad); resizeObserver.disconnect(); }; }, [syncCanvasSize]);
 
+    // Calcule le style du curseur en fonction de l'outil
+    const getCursorStyle = () => {
+        if (isPanning) return 'grabbing';
+        if (currentTool === 'cursor') return 'default';
+
+        if (currentTool === 'eraser') {
+            // Crée un cercle SVG pour représenter la gomme (30px de diamètre ici)
+            const size = 30;
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2 - 1}" fill="none" stroke="white" stroke-width="2" /><circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="none" stroke="black" stroke-width="1" /></svg>`;
+            return `url('data:image/svg+xml;base64,${btoa(svg)}') ${size/2} ${size/2}, auto`;
+        }
+
+        return 'crosshair'; // Pour le stylo et les agents
+    };
+
     return (
         <div className="flex flex-col lg:flex-row h-full w-full">
             <div className="absolute top-4 left-4 z-30 lg:static lg:h-full lg:w-auto lg:p-4 lg:bg-[#181b1e] lg:border-r lg:border-gray-800">
                 <ToolsSidebar currentTool={currentTool} setTool={setCurrentTool} strokeType={strokeType} setStrokeType={setStrokeType} color={color} setColor={setColor} opacity={opacity} setOpacity={setOpacity} thickness={thickness} setThickness={setThickness} selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent} onSave={() => saveStrategy(drawings)} onLoad={fetchStrategies} />
             </div>
-            <div ref={containerRef} className="relative flex-1 w-full h-full bg-[#1f2326] overflow-hidden select-none" style={{ cursor: currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'default') }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDragOver={handleDragOver} onDrop={handleDrop}>
+            <div ref={containerRef} className="relative flex-1 w-full h-full bg-[#1f2326] overflow-hidden select-none" style={{ cursor: getCursorStyle() }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}>
                 <div ref={contentRef} className="origin-top-left absolute top-0 left-0" draggable={false}>
                     <img ref={imgRef} src={mapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px] h-auto border-2 border-slate-600 shadow-lg" onLoad={syncCanvasSize} />
                     <canvas ref={mainCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />

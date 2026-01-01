@@ -8,7 +8,8 @@ export type StrokeType =
     | 'brimstone_c_zone' | 'brimstone_x_zone' // Brimstone
     | 'chamber_c_zone' | 'chamber_e_zone' // Chamber
     | 'cypher_c_wire'| 'cypher_q_zone'// Cypher
-    | 'deadlock_c_wall'| 'deadlock_q_sensor'; // Deadlock
+    | 'deadlock_c_wall'| 'deadlock_q_sensor' // Deadlock
+    | 'fade_q_zone' | 'fade_e_zone' | 'fade_x_zone'; // Fade
 
 export interface DrawingObject {
     id: number;
