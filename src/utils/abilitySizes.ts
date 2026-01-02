@@ -162,4 +162,33 @@ export const ABILITY_SIZES: Record<string, number> = {
     'veto_e_radius': 210,
     'veto_e_icon_size': 30,
     'veto_x': 30,
+
+    // VIPER
+    'viper_c': 130,
+    'viper_q': 130,
+    'viper_x': 160,
+    'viper_e_length': 750,
+    'viper_e_width': 10,
+
+    // VYSE
+    'vyse_c':130,
+    'vyse_e':30,
+    'vyse_q_width': 10,
+    'vyse_q_length': 150,
+    'vyse_x_radius': 300,
+    'vyse_x_icon_size': 30,
+
+    // WAYLAY
+    'waylay_c': 130,
+    'waylay_q': 30,
+    'waylay_e': 30,
+    'waylay_x_width': 160,
+    'waylay_x_length': 450,
+
+    // YORU
+    'yoru_c': 30,
+    'yoru_q':30,
+    'yoru_e': 30,
+    'yoru_x': 30,
+
 };

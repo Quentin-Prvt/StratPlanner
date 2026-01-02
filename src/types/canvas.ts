@@ -20,7 +20,12 @@ export type StrokeType =
     | 'sage_c_wall' // Sage
     | 'sova_e_bolt' | 'sova_x_blast' // Sova
     | 'tejo_x_zone' // Tejo
-    | 'veto_c_zone' | 'veto_q_zone' | 'veto_e_zone'; // Veto
+    | 'veto_c_zone' | 'veto_q_zone' | 'veto_e_zone' // Veto
+    | 'viper_e_wall' // Viper
+    | 'vyse_q_wall' | 'vyse_x_zone' // Vyse
+    | 'waylay_x_zone'; // Waylay
+
+
 export interface DrawingObject {
     id: number;
     tool: StrokeType | 'image';

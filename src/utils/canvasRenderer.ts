@@ -28,7 +28,9 @@ import { drawSageWall } from './abilities/sageAbilities';
 import { drawSovaBolt, drawSovaUlt } from './abilities/sovaAbilities';
 import { drawTejoUlt } from './abilities/tejoUlt';
 import { drawVetoZone } from './abilities/vetoAbilities';
-
+import { drawViperWall } from './abilities/viperAbilities';
+import { drawVyseWall, drawVyseUltZone } from './abilities/vyseAbilities';
+import { drawWaylayUlt } from './abilities/waylayAbilities';
 /**
  * Fonction principale qui dessine tout sur le canvas
  */
@@ -90,6 +92,10 @@ export const renderDrawings = (
         if (obj.tool === 'sova_x_blast') {drawSovaUlt(ctx, obj);return;}
         if (obj.tool === 'tejo_x_zone') {drawTejoUlt(ctx, obj);return;}
         if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) {drawVetoZone(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'viper_e_wall') {drawViperWall(ctx, obj);return;}
+        if (obj.tool === 'vyse_q_wall') {drawVyseWall(ctx, obj);return;}
+        if (obj.tool === 'vyse_x_zone') {drawVyseUltZone(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'waylay_x_zone') {drawWaylayUlt(ctx, obj);return;}
         // --- B. IMAGES CLASSIQUES & ICONES ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             // Détection du type pour le dossier
@@ -103,7 +109,7 @@ export const renderDrawings = (
                 'iso_e','jett_q','jett_e','jett_x','kayo_q',
                 'neon_e', 'neon_x',
                 'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x', 'reyna_q','reyna_e','reyna_x', 'sage_e','sage_x', 'skye_c', 'skye_q', 'skye_e', 'skye_x',
-                'sova_c', 'tejo_c', 'veto_x'
+                'sova_c', 'tejo_c', 'veto_x', 'vyse_e', 'yoru_c', 'yoru_q', 'yoru_e', 'yoru_x', 'waylay_q', 'waylay_e'
             ].some(key => obj.imageSrc?.includes(key));
 
             // Gestion du chargement d'image
