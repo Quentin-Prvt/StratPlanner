@@ -98,8 +98,14 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             const finalX = (mouseX - x) / scale;
             const finalY = (mouseY - y) / scale;
 
-            // On utilise la factory externalisée
-            const newObj = createDrawingFromDrop(type, name, finalX, finalY);
+            const img = imgRef.current;
+            if (!img) return;
+
+            // Restreindre la position de drop aux dimensions de l'image (la map)
+            const clampedX = clamp(finalX, 0, img.clientWidth);
+            const clampedY = clamp(finalY, 0, img.clientHeight);
+
+            const newObj = createDrawingFromDrop(type, name, clampedX, clampedY);
 
             if (newObj) {
                 setDrawings(prev => [...prev, newObj]);
@@ -109,6 +115,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     };
 
     // --- INTERACTION ---
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
     const getMousePos = (e: React.MouseEvent) => {
         const canvas = tempCanvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -220,8 +227,23 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
         const pos = getMousePos(e);
 
         if (draggingObjectId !== null && specialDragMode) {
+            const canvas = mainCanvasRef.current;
+            if (!canvas) return;
+
             setDrawings(prev => prev.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
+
+                // On définit les limites
+                const limX = canvas.width;
+                const limY = canvas.height;
+
+                if (obj.tool === 'image') {
+                    return {
+                        ...obj,
+                        x: clamp(pos.x - dragOffset.x, 0, limX),
+                        y: clamp(pos.y - dragOffset.y, 0, limY)
+                    };
+                }
                 // --- UPDATES ABILITIES ---
                 if (obj.tool === 'stun_zone') return updateBreachStunPosition(obj, pos, specialDragMode as any, dragOffset);
                 if (obj.tool === 'breach_x_zone') return updateBreachUltPosition(obj, pos, specialDragMode as any, dragOffset);
@@ -258,7 +280,15 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
         if (currentTool === 'eraser') { eraseObjectAt(pos.x, pos.y); return; }
         // Dessin temporaire Pen/Shape
         if (currentTool === 'pen') {
-            pointsRef.current.push(pos);
+            const canvas = mainCanvasRef.current;
+            if (!canvas) return;
+
+            // On restreint le point aux limites du canvas
+            const clampedPos = {
+                x: clamp(pos.x, 0, canvas.width),
+                y: clamp(pos.y, 0, canvas.height)
+            };
+            pointsRef.current.push(clampedPos);
             const tempCtx = getContext(tempCanvasRef);
             if (!tempCtx || !tempCanvasRef.current) return;
             tempCtx.clearRect(0, 0, tempCanvasRef.current.width, tempCtx.canvas.height);
@@ -368,11 +398,11 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-full w-full">
+        <div className="flex flex-col lg:flex-row h-full w-fullbg-[#1f2326] ">
             <div className="absolute top-4 left-4 z-30 lg:static lg:h-full lg:w-auto lg:p-4 lg:bg-[#181b1e] lg:border-r lg:border-gray-800">
                 <ToolsSidebar currentTool={currentTool} setTool={setCurrentTool} strokeType={strokeType} setStrokeType={setStrokeType} color={color} setColor={setColor} opacity={opacity} setOpacity={setOpacity} thickness={thickness} setThickness={setThickness} selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent} onSave={() => saveStrategy(drawings)} onLoad={fetchStrategies} />
             </div>
-            <div ref={containerRef} className="relative flex-1 w-full h-full bg-[#1f2326] overflow-hidden select-none" style={{ cursor: getCursorStyle() }}
+            <div ref={containerRef} className="relative flex-1 w-full h-full overflow-hidden select-none" style={{ cursor: getCursorStyle() }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -380,7 +410,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}>
                 <div ref={contentRef} className="origin-top-left absolute top-0 left-0" draggable={false}>
-                    <img ref={imgRef} src={mapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px] h-auto border-2 border-slate-600 shadow-lg" onLoad={syncCanvasSize} />
+                    <img ref={imgRef} src={mapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px]  p-6 h-auto bg-[#1f2326] shadow-lg" onLoad={syncCanvasSize} />
                     <canvas ref={mainCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                     <canvas ref={tempCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                 </div>

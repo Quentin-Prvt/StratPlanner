@@ -42,8 +42,8 @@ export const ToolsSidebar = ({
     const agents = [
         'astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock',
         'fade', 'gekko', 'harbor', 'iso', 'jett', 'kayo', 'killjoy', 'neon',
-        'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova', 'viper',
-        'vyse', 'yoru'
+        'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova','tejo','veto', 'viper',
+        'vyse','waylay', 'yoru'
     ];
 
     const abilities = ['c', 'q', 'e', 'x'];

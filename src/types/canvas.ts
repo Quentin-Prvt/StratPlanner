@@ -9,7 +9,8 @@ export type StrokeType =
     | 'chamber_c_zone' | 'chamber_e_zone' // Chamber
     | 'cypher_c_wire'| 'cypher_q_zone'// Cypher
     | 'deadlock_c_wall'| 'deadlock_q_sensor' // Deadlock
-    | 'fade_q_zone' | 'fade_e_zone' | 'fade_x_zone'; // Fade
+    | 'fade_q_zone' | 'fade_e_zone' | 'fade_x_zone' // Fade
+    | 'gekko_c_zone' |'gekko_q'; // Gekko
 
 export interface DrawingObject {
     id: number;

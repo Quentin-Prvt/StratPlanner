@@ -51,4 +51,9 @@ export const ABILITY_SIZES: Record<string, number> = {
     'fade_e_radius': 333,      // Zone de détection plus large
     'fade_e_icon_size': 30,    // Icône légèrement plus grande
 
+    // GEKKO
+    'gekko_c': 130, // Molly
+    'gekko_e': 30, // Verti
+    'gekko_x': 30, // mordicus
+
 };

@@ -128,7 +128,7 @@ export const createDrawingFromDrop = (
     // --- 5. IMAGES GÉNÉRIQUES (Agents, Smokes, Mollys, Icons) ---
 
     // Liste des sorts qui utilisent l'image "_icon"
-    const useIconFile = ['breach_q', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x', 'fade_c'];
+    const useIconFile = ['breach_q', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x', 'fade_c','gekko_e','gekko_x'];
 
     const suffix = useIconFile.includes(name) ? '_icon' : '_game';
     const finalImageSrc = type === 'ability' ? `${name}${suffix}` : name;

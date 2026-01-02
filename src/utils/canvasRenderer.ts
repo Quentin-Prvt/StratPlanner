@@ -71,7 +71,7 @@ export const renderDrawings = (
             const isIconStyle = [
                 'breach_q',
                 'chamber_q', 'chamber_x',
-                'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c'
+                'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c', 'gekko_e','gekko_x'
             ].some(key => obj.imageSrc?.includes(key));
 
             // Gestion du chargement d'image
