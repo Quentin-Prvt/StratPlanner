@@ -32,6 +32,10 @@ import { checkKilljoyHit, updateKilljoyPosition } from '../utils/abilities/killj
 import { checkNeonHit, updateNeonPosition } from '../utils/abilities/neonAbilities';
 import { checkOmenHit, updateOmenPosition } from '../utils/abilities/omenAbilities';
 import { checkRazeHit, updateRazePosition } from '../utils/abilities/razeAbilities';
+import { checkSageHit, updateSagePosition } from '../utils/abilities/sageAbilities';
+import { checkSovaHit, updateSovaPosition } from '../utils/abilities/sovaAbilities';
+import { checkTejoUltHit, updateTejoUltPosition } from '../utils/abilities/tejoUlt';
+import { checkVetoHit, updateVetoPosition } from '../utils/abilities/vetoAbilities';
 
 interface EditorCanvasProps {
     mapSrc: string;
@@ -252,6 +256,42 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                         return;
                     }
                 }
+                if (obj.tool === 'sage_c_wall') {
+                    const hit = checkSageHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool.startsWith('sova_')) {
+                    const hit = checkSovaHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool === 'tejo_x_zone') {
+                    const hit = checkTejoUltHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) {
+                    const hit = checkVetoHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode); // 'center'
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
                 // --- HIT TEST IMAGES ---
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = obj.width || 50; const h = obj.height || 50;
@@ -330,7 +370,10 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                 if (obj.tool === 'neon_c_wall' || obj.tool === 'neon_q_zone') {return updateNeonPosition(obj, pos, specialDragMode as any, dragOffset);}
                 if (obj.tool === 'omen_q_zone') {return updateOmenPosition(obj, pos, specialDragMode as any, dragOffset);}
                 if (obj.tool === 'raze_c_boombot') {return updateRazePosition(obj, pos, specialDragMode as any, dragOffset);}
-
+                if (obj.tool === 'sage_c_wall') {return updateSagePosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (obj.tool.startsWith('sova_')) {return updateSovaPosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (obj.tool === 'tejo_x_zone') {return updateTejoUltPosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) {return updateVetoPosition(obj, pos, dragOffset);}
                 return obj;
             }));
             return;
@@ -415,7 +458,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); }
 
             // Gomme Multi-points (Wall, Stun, Ult Breach, Aftershock, Trapwire Cypher)
-            if (obj.tool === 'wall' || obj.tool === 'stun_zone'|| obj.tool ===  'neon_c_wall' || obj.tool === 'omen_q_zone'|| obj.tool === 'fade_x_zone' ||obj.tool === 'breach_x_zone' ||obj.tool === 'gekko_q_wingman' ||obj.tool ==='raze_c_boombot'|| obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor'|| obj.tool ===  'iso_c_wall'|| obj.tool ===  'iso_q_zone'|| obj.tool ===  'iso_x_zone') {
+            if (obj.tool === 'wall'|| obj.tool === 'tejo_x_zone' || obj.tool ==='sage_c_wall'|| obj.tool ==='sova_x_blast'|| obj.tool === 'stun_zone'|| obj.tool ===  'neon_c_wall' || obj.tool === 'omen_q_zone'|| obj.tool === 'fade_x_zone' ||obj.tool === 'breach_x_zone' ||obj.tool === 'gekko_q_wingman' ||obj.tool ==='raze_c_boombot'|| obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor'|| obj.tool ===  'iso_c_wall'|| obj.tool ===  'iso_q_zone'|| obj.tool ===  'iso_x_zone') {
                 const p1 = obj.points[0]; const p2 = obj.points[1];
                 if (obj.tool === 'deadlock_c_wall') {
                     return Math.hypot(x - p1.x, y - p1.y) > 30;
@@ -425,7 +468,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             }
 
             // Gomme Circulaire (Brimstone, Chamber, Fade, etc.)
-            if (['brimstone_c_zone','fade_q_zone','neon_q_zone','fade_e_zone','killjoy_q_zone', 'killjoy_x_zone', 'killjoy_e_turret', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone', 'kayo_e_zone', 'kayo_x_zone'].includes(obj.tool as string)) {
+            if (['brimstone_c_zone', 'veto_c_zone', 'veto_q_zone', 'veto_e_zone','fade_q_zone','neon_q_zone','fade_e_zone','killjoy_q_zone', 'killjoy_x_zone','sova_e_bolt', 'killjoy_e_turret', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone', 'kayo_e_zone', 'kayo_x_zone'].includes(obj.tool as string)) {
                 const center = obj.points[0];
                 return Math.hypot(x - center.x, y - center.y) > 25;
             }

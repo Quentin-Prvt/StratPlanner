@@ -24,6 +24,10 @@ import { drawKilljoyZone, drawKilljoyTurret } from './abilities/killjoyAbilities
 import { drawNeonWall, drawNeonStun } from './abilities/neonAbilities';
 import { drawOmenParanoia } from './abilities/omenAbilities';
 import { drawRazeBoomBot } from './abilities/razeAbilities';
+import { drawSageWall } from './abilities/sageAbilities';
+import { drawSovaBolt, drawSovaUlt } from './abilities/sovaAbilities';
+import { drawTejoUlt } from './abilities/tejoUlt';
+import { drawVetoZone } from './abilities/vetoAbilities';
 
 /**
  * Fonction principale qui dessine tout sur le canvas
@@ -81,6 +85,11 @@ export const renderDrawings = (
         if (obj.tool === 'neon_q_zone') {drawNeonStun(ctx, obj, imageCache, triggerRedraw);return;}
         if (obj.tool === 'omen_q_zone') {drawOmenParanoia(ctx, obj);return;}
         if (obj.tool === 'raze_c_boombot') {drawRazeBoomBot(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'sage_c_wall') {drawSageWall(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'sova_e_bolt') {drawSovaBolt(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'sova_x_blast') {drawSovaUlt(ctx, obj);return;}
+        if (obj.tool === 'tejo_x_zone') {drawTejoUlt(ctx, obj);return;}
+        if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) {drawVetoZone(ctx, obj, imageCache, triggerRedraw);return;}
         // --- B. IMAGES CLASSIQUES & ICONES ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             // Détection du type pour le dossier
@@ -93,7 +102,8 @@ export const renderDrawings = (
                 'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c', 'gekko_e','gekko_x',
                 'iso_e','jett_q','jett_e','jett_x','kayo_q',
                 'neon_e', 'neon_x',
-                'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x'
+                'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x', 'reyna_q','reyna_e','reyna_x', 'sage_e','sage_x', 'skye_c', 'skye_q', 'skye_e', 'skye_x',
+                'sova_c', 'tejo_c', 'veto_x'
             ].some(key => obj.imageSrc?.includes(key));
 
             // Gestion du chargement d'image

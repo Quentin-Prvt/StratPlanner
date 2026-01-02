@@ -249,12 +249,98 @@ export const createDrawingFromDrop = (
             opacity: 1
         };
     }
+    if (name === 'sage_c') {
+        const dist = ABILITY_SIZES['sage_c_handle_dist'] || 70;
+        const toolName: StrokeType = 'sage_c_wall';
+
+        return {
+            id,
+            tool: toolName,
+            subtype: 'ability',
+            points: [{ x, y }, { x, y: y - dist }], // P1 et P2
+            imageSrc: 'sage_c_game', // Assurez-vous d'avoir cette image
+            color: '#2dd4bf',
+            thickness: 0,
+            opacity: 1
+        };
+    }
+    if (name.startsWith('sova_')) {
+        // E - Recon (Rond avec Icone)
+        if (name === 'sova_e') {
+            const toolName: StrokeType = 'sova_e_bolt';
+            return {
+                id,
+                tool: toolName,
+                subtype: 'ability',
+                points: [{x, y}],
+                imageSrc: 'sova_e_icon',
+                color: '#3b82f6',
+                thickness: 0,
+                opacity: 0.6
+            };
+        }
+    }
+
+        // X - Hunter's Fury (Rectangle Directionnel)
+        if (name === 'sova_x') {
+            const length = ABILITY_SIZES['sova_x_length'] || 900;
+            const toolName: StrokeType = 'sova_x_blast';
+            return {
+                id,
+                tool: toolName,
+                subtype: 'ability',
+                points: [{x, y}, {x: x + length, y}], // P1 et P2
+                color: '#3b82f6',
+                thickness: 0,
+                opacity: 0.6
+            };
+        }
+        if (name === 'tejo_x') {
+            const length = ABILITY_SIZES['tejo_x_length'] || 650;
+            const toolName: StrokeType = 'tejo_x_zone';
+
+            return {
+                id,
+                tool: toolName,
+                subtype: 'ability',
+                points: [{ x, y }, { x: x + length, y }],
+                color: '#475569',
+                thickness: 0,
+                opacity: 0.6
+            };
+        }
+    if (name.startsWith('veto_')) {
+        // C, Q, E -> Zones Circulaires
+        if (['veto_c', 'veto_q', 'veto_e'].includes(name)) {
+            // Astuce pour générer le nom du tool dynamiquement : veto_c_zone, veto_q_zone...
+            const toolName = `${name}_zone` as StrokeType;
+
+            // Couleurs par défaut (seront surchargées par le dessinateur, mais utiles ici)
+            let color = '#ef4444';
+            if (name === 'veto_q') color = '#a855f7';
+            if (name === 'veto_e') color = '#ec4899';
+
+            return {
+                id,
+                tool: toolName,
+                subtype: 'ability',
+                points: [{ x, y }],
+                imageSrc: `${name}_icon`, // ex: veto_c_icon
+                color: color,
+                thickness: 0,
+                opacity: 0.6
+            };
+        }
+    }
+
     // --- 5. IMAGES GÉNÉRIQUES (Agents, Smokes, Mollys, Icons) ---
 
     // Liste des sorts qui utilisent l'image "_icon"
     const useIconFile = ['breach_q',
         'neon_e', 'neon_x','kayo_q','jett_q','jett_e','jett_x', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x', 'fade_c','gekko_e','gekko_x', 'iso_e',
-        'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x'];
+        'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x', 'reyna_q','reyna_e','reyna_x', 'sage_e','sage_x', 'skye_c', 'skye_q', 'skye_e', 'skye_x', 'sova_c',
+        'tejo_c', 'veto_x'
+    ];
 
     const suffix = useIconFile.includes(name) ? '_icon' : '_game';
     const finalImageSrc = type === 'ability' ? `${name}${suffix}` : name;

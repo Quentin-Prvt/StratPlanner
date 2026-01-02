@@ -121,4 +121,45 @@ export const ABILITY_SIZES: Record<string, number> = {
     'raze_x':30,
     'raze_c_size': 100,
     'raze_c_handle_dist': 30,
+
+    // REYNA
+    'reyna_q':30,
+    'reyna_e':30,
+    'reyna_x':30,
+
+    // SAGE
+    'sage_e':30,
+    'sage_x':30,
+    'sage_c_size': 110,
+    'sage_c_handle_dist': 70,
+
+    // SKYE
+    'skye_c': 30,
+    'skye_q': 30,
+    'skye_e': 30,
+    'skye_x':30,
+
+    // SOVA
+    'sova_c': 30,
+    'sova_q': 100,
+    'sova_e_radius': 333,
+    'sova_e_icon_size': 30,
+    'sova_x_width': 65,
+    'sova_x_length': 1000,
+
+    // TEJO
+    'tejo_c':30,
+    'tejo_q':130,
+    'tejo_e':130,
+    'tejo_x_width': 150,
+    'tejo_x_length': 370,
+
+    // VETO
+    'veto_c_radius': 260,
+    'veto_c_icon_size': 30,
+    'veto_q_radius': 65,
+    'veto_q_icon_size': 30,
+    'veto_e_radius': 210,
+    'veto_e_icon_size': 30,
+    'veto_x': 30,
 };

@@ -2,7 +2,7 @@ import { EditorCanvas } from "../components/EditorCanvas";
 
 export const AscentPage = () => {
     return (
-        <div className="h-screen w-screen bg-[#121516] flex flex-col overflow-hidden">
+        <div className="h-screen w-screen  flex flex-col overflow-hidden">
             {/* Header compact */}
             <header className="flex-none py-3 px-6 bg-[#181b1e] border-b border-gray-800 flex items-center justify-between z-10">
                 <div className="flex items-baseline gap-4">

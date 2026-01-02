@@ -16,7 +16,11 @@ export type StrokeType =
     | 'killjoy_q_zone' | 'killjoy_e_turret' | 'killjoy_x_zone' // Killjoy
     | 'neon_c_wall' | 'neon_q_zone' // Neon
     | 'omen_q_zone' // Omen
-    | 'raze_c_boombot'; // Raze
+    | 'raze_c_boombot' // Raze
+    | 'sage_c_wall' // Sage
+    | 'sova_e_bolt' | 'sova_x_blast' // Sova
+    | 'tejo_x_zone' // Tejo
+    | 'veto_c_zone' | 'veto_q_zone' | 'veto_e_zone'; // Veto
 export interface DrawingObject {
     id: number;
     tool: StrokeType | 'image';
