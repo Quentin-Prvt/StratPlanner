@@ -24,7 +24,8 @@ export const drawVetoZone = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    showZones: boolean
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
@@ -36,14 +37,15 @@ export const drawVetoZone = (
     ctx.save();
 
     // 1. Zone
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = conf.color;
-    ctx.strokeStyle = conf.stroke;
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
-
+    if (showZones) {
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = conf.color;
+        ctx.strokeStyle = conf.stroke;
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+    }
 
     // 2. Icône
     if (imageCache && obj.imageSrc) {

@@ -8,7 +8,8 @@ export const drawChamberRendezvous = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    showZones: boolean
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
@@ -20,6 +21,7 @@ export const drawChamberRendezvous = (
     ctx.save();
 
     // 1. Zone de TP (Cercle Doré)
+    if(showZones) {
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
 
@@ -29,13 +31,8 @@ export const drawChamberRendezvous = (
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
+}
 
-    // Petit cercle intérieur pour le style
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius * 0.95, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
 
     // 2. Icône Centrale
     ctx.translate(center.x, center.y);

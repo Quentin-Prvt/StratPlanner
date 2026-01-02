@@ -91,7 +91,7 @@ export const ABILITY_SIZES: Record<string, number> = {
     'killjoy_q_icon_size': 30,
     'killjoy_e_size': 30,       // Taille de l'image de la tourelle
     'killjoy_e_handle_dist': 50,// Distance du losange de rotation
-    'killjoy_x_radius': 370,
+    'killjoy_x_radius': 245,
     'killjoy_x_icon_size': 30,
 
     // NEON

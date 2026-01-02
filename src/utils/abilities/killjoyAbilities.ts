@@ -8,7 +8,8 @@ export const drawKilljoyZone = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    showZones: boolean
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
@@ -24,14 +25,15 @@ export const drawKilljoyZone = (
     ctx.save();
 
     // Zone
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
-
+    if (showZones) {
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+    }
     // Icône
     if (imageCache && obj.imageSrc) {
         let img = imageCache.get(obj.imageSrc);

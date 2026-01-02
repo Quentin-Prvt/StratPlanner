@@ -1,134 +1,166 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { debounce } from 'lodash';
 import { ToolsSidebar } from './ToolsSidebar';
 import { LoadModal } from './LoadModal';
 import { useSupabaseStrategies } from '../hooks/useSupabase';
-import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing'; // Pour le tracé en cours (stylo)
-import type { DrawingObject, ToolType, StrokeType } from '../types/canvas';
-
-// --- IMPORTS OPTIMISÉS ---
+import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing';
 import { renderDrawings } from '../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../utils/dropFactory';
+import { TextEditorModal } from './TextEditorModal';
+import type { DrawingObject, ToolType, StrokeType } from '../types/canvas';
 
-// --- LOGIQUE DE DÉPLACEMENT DES ABILITÉS ---
-import { checkBreachStunHit, updateBreachStunPosition } from '../utils/abilities/breachStun';
-import { checkAstraWallHit, updateAstraWallPosition } from '../utils/abilities/astraWall';
-import { checkBreachUltHit, updateBreachUltPosition } from '../utils/abilities/breachUlt';
-import { checkBreachAftershockHit, updateBreachAftershockPosition } from '../utils/abilities/breachAftershock';
-import { checkBrimstoneStimHit, updateBrimstoneStimPosition } from '../utils/abilities/brimstoneStim';
-import { checkBrimstoneUltHit, updateBrimstoneUltPosition } from '../utils/abilities/brimstoneUlt';
-import { checkChamberTrademarkHit, updateChamberTrademarkPosition } from '../utils/abilities/chamberTrademark';
-import { checkChamberRendezvousHit, updateChamberRendezvousPosition } from '../utils/abilities/chamberRendezvous';
-import { checkCypherTrapwireHit, updateCypherTrapwirePosition } from '../utils/abilities/cypherTrapwire';
-import { checkCypherCageHit, updateCypherCagePosition } from '../utils/abilities/cypherCage';
-import { checkDeadlockWallHit, updateDeadlockWallPosition } from '../utils/abilities/deadlockWall';
-import { checkDeadlockSensorHit, updateDeadlockSensorPosition } from '../utils/abilities/deadlockSensor';
-import { checkFadeUltHit, updateFadeUltPosition } from '../utils/abilities/fadeUlt';
-import { checkFadeSeizeHit, updateFadeSeizePosition } from '../utils/abilities/fadeSeize.ts';
-import { checkFadeHauntHit, updateFadeHauntPosition } from '../utils/abilities/fadeHaunt';
-import { checkGekkoQHit, updateGekkoQPosition} from "../utils/abilities/gekkoQ.ts";
-import { checkIsoHit, updateIsoPosition } from '../utils/abilities/isoAbilities';
-import { checkKayoHit, updateKayoPosition } from '../utils/abilities/kayoAbilities';
-import { checkKilljoyHit, updateKilljoyPosition } from '../utils/abilities/killjoyAbilities';
-import { checkNeonHit, updateNeonPosition } from '../utils/abilities/neonAbilities';
-import { checkOmenHit, updateOmenPosition } from '../utils/abilities/omenAbilities';
-import { checkRazeHit, updateRazePosition } from '../utils/abilities/razeAbilities';
-import { checkSageHit, updateSagePosition } from '../utils/abilities/sageAbilities';
-import { checkSovaHit, updateSovaPosition } from '../utils/abilities/sovaAbilities';
-import { checkTejoUltHit, updateTejoUltPosition } from '../utils/abilities/tejoUlt';
-import { checkVetoHit, updateVetoPosition } from '../utils/abilities/vetoAbilities';
-import { checkViperHit, updateViperPosition } from '../utils/abilities/viperAbilities';
-import { checkVyseHit, updateVysePosition } from '../utils/abilities/vyseAbilities';
-import { checkWaylayHit, updateWaylayPosition } from '../utils/abilities/waylayAbilities';
+// NOUVEAUX IMPORTS
+import { useCanvasZoom } from '../hooks/useCanvasZoom';
+import { checkAbilityHit, updateAbilityPosition } from '../utils/canvasHitDetection';
+import { MAPS_REGISTRY } from '../utils/mapsRegistry'; // <--- Import du registre des cartes
 
 interface EditorCanvasProps {
-    mapSrc: string;
+    // mapSrc: string;  <-- SUPPRIMÉ car géré en interne maintenant
+    strategyId: string;
 }
 
-export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
+export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     // --- REFS ---
     const mainCanvasRef = useRef<HTMLCanvasElement>(null);
     const tempCanvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const contentRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const pointsRef = useRef<{x: number, y: number}[]>([]);
     const startPosRef = useRef<{x: number, y: number}>({x: 0, y: 0});
-    const transformRef = useRef({ scale: 1, x: 0, y: 0 });
     const panStartRef = useRef({ x: 0, y: 0 });
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
+    // --- HOOKS PERSONNALISÉS ---
+    const { transformRef, contentRef, updateTransformStyle } = useCanvasZoom(containerRef);
+    const { savedStrategies, isLoading, showLoadModal, setShowLoadModal, fetchStrategies, getStrategyById, updateStrategyData } = useSupabaseStrategies();
+
     // --- STATES ---
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [currentMapSrc, setCurrentMapSrc] = useState<string | null>(null);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [drawings, setDrawings] = useState<DrawingObject[]>([]);
-    const [currentTool, setCurrentTool] = useState<ToolType>('pen');
+    const [showZones, setShowZones] = useState(true);
+    const [notification, setNotification] = useState<{message: string, type: 'success' | 'info'} | null>(null);
+
+    // Texte
+    const [isTextModalOpen, setIsTextModalOpen] = useState(false);
+    const [editingTextId, setEditingTextId] = useState<number | null>(null);
+
+    // Outils & Style
+    const [currentTool, setCurrentTool] = useState<ToolType | 'tools' | 'settings' | 'text' | null>('cursor');
     const [strokeType, setStrokeType] = useState<StrokeType>('solid');
     const [color, setColor] = useState('#ef4444');
     const [opacity, setOpacity] = useState(1);
     const [thickness, setThickness] = useState(4);
     const [selectedAgent, setSelectedAgent] = useState('jett');
 
+    // Interactions
     const [isDrawing, setIsDrawing] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
     const [draggingObjectId, setDraggingObjectId] = useState<number | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
-    // Drag mode spécial pour les objets complexes (p1, p2, center, body...)
     const [specialDragMode, setSpecialDragMode] = useState<string | null>(null);
     const [wallCenterStart, setWallCenterStart] = useState({ x: 0, y: 0 });
 
-    const { savedStrategies, isLoading, showLoadModal, setShowLoadModal, saveStrategy, fetchStrategies } = useSupabaseStrategies('Ascent');
-
-    const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return null;
-        return canvas.getContext('2d');
+    // --- NOTIFICATIONS ---
+    const showToast = (msg: string) => {
+        setNotification({ message: msg, type: 'success' });
+        setTimeout(() => setNotification(null), 3000);
     };
 
-    // --- RENDU ---
+    // --- INITIALISATION & CHARGEMENT DE LA MAP ---
+    useEffect(() => {
+        const loadInitialData = async () => {
+            if (!strategyId) return;
+            const data = await getStrategyById(strategyId);
+
+            if (data) {
+                // 1. Charger les dessins
+                if (data.data) {
+                    setDrawings(data.data);
+                }
+
+                // 2. Charger la bonne image de MAP
+                if (data.map_name) {
+                    const mapKey = data.map_name.toLowerCase();
+                    const src = MAPS_REGISTRY[mapKey];
+                    if (src) {
+                        setCurrentMapSrc(src);
+                    } else {
+                        console.error(`Map "${mapKey}" introuvable dans le registre.`);
+                    }
+                }
+            }
+            setIsLoaded(true);
+        };
+        loadInitialData();
+    }, [strategyId]);
+
+    // --- AUTO-SAVE ---
+    const debouncedSave = useMemo(
+        () => debounce((id: string, data: any[]) => {
+            updateStrategyData(id, data).then(() => {
+                setSaveStatus('saved');
+                setTimeout(() => setSaveStatus('idle'), 2000);
+            });
+        }, 500),
+        [updateStrategyData]
+    );
+
+    useEffect(() => {
+        if (!isLoaded || !strategyId) return;
+        setSaveStatus('saving');
+        debouncedSave(strategyId, drawings);
+        return () => debouncedSave.cancel();
+    }, [drawings, strategyId, isLoaded, debouncedSave]);
+
+    // --- GESTION TEXTE ---
+    useEffect(() => {
+        if (currentTool === 'text') setIsTextModalOpen(true);
+    }, [currentTool]);
+
+    // --- GESTION CANVAS ---
+    const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
+        const canvas = canvasRef.current;
+        return canvas ? canvas.getContext('2d') : null;
+    };
+
     const redrawMainCanvas = useCallback(() => {
         const canvas = mainCanvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
-
-        // On utilise le renderer externalisé
-        renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId);
-    }, [drawings, draggingObjectId]);
+        renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId, showZones);
+    }, [drawings, draggingObjectId, showZones]);
 
     useEffect(() => { redrawMainCanvas(); }, [drawings, redrawMainCanvas, draggingObjectId]);
 
-    // --- DROP HANDLER ---
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        const jsonData = e.dataTransfer.getData("application/json");
-        if (!jsonData) return;
-        try {
-            const { type, name } = JSON.parse(jsonData);
-            const rect = containerRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            const { x, y, scale } = transformRef.current;
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            const finalX = (mouseX - x) / scale;
-            const finalY = (mouseY - y) / scale;
+    const syncCanvasSize = useCallback(() => {
+        const main = mainCanvasRef.current;
+        const temp = tempCanvasRef.current;
+        const img = imgRef.current;
+        if (main && temp && img && img.clientWidth > 0) {
+            main.width = temp.width = img.clientWidth;
+            main.height = temp.height = img.clientHeight;
+            redrawMainCanvas();
+        }
+    }, [redrawMainCanvas]);
 
-            const img = imgRef.current;
-            if (!img) return;
+    useEffect(() => {
+        const img = imgRef.current;
+        if (!img) return;
+        if (img.complete && img.naturalWidth > 0) syncCanvasSize();
+        const onLoad = () => syncCanvasSize();
+        img.addEventListener('load', onLoad);
+        const resizeObserver = new ResizeObserver(() => syncCanvasSize());
+        resizeObserver.observe(img);
+        return () => { img.removeEventListener('load', onLoad); resizeObserver.disconnect(); };
+    }, [syncCanvasSize]);
 
-            // Restreindre la position de drop aux dimensions de l'image (la map)
-            const clampedX = clamp(finalX, 0, img.clientWidth);
-            const clampedY = clamp(finalY, 0, img.clientHeight);
 
-            const newObj = createDrawingFromDrop(type, name, clampedX, clampedY);
-
-            if (newObj) {
-                setDrawings(prev => [...prev, newObj]);
-                setCurrentTool('cursor');
-            }
-        } catch (err) { console.error("Drop error", err); }
-    };
-
-    // --- INTERACTION ---
+    // --- HELPERS SOURIS ---
     const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+
     const getMousePos = (e: React.MouseEvent) => {
         const canvas = tempCanvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -139,8 +171,83 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
         return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
     };
 
+    // --- LOGIQUE TEXTE (Double Clic + Save) ---
+    const handleDoubleClick = (e: React.MouseEvent) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const { x, y, scale } = transformRef.current;
+        const finalX = (mouseX - x) / scale;
+        const finalY = (mouseY - y) / scale;
+
+        for (let i = drawings.length - 1; i >= 0; i--) {
+            const obj = drawings[i];
+            if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
+                const fontSize = obj.fontSize || 20;
+                const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
+                const halfH = fontSize / 2;
+
+                if (finalX >= obj.x - approxWidth / 2 && finalX <= obj.x + approxWidth / 2 && finalY >= obj.y - halfH && finalY <= obj.y + halfH) {
+                    setEditingTextId(obj.id);
+                    setIsTextModalOpen(true);
+                    return;
+                }
+            }
+        }
+    };
+
+    const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
+        // Mode Mise à jour
+        if (editingTextId !== null) {
+            setDrawings(prev => prev.map(obj => {
+                if (obj.id === editingTextId) {
+                    return { ...obj, text: data.text, color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal', fontStyle: data.isItalic ? 'italic' : 'normal' };
+                }
+                return obj;
+            }));
+            setEditingTextId(null);
+            setIsTextModalOpen(false);
+            setCurrentTool('cursor');
+            return;
+        }
+
+        // Mode Création (avec Clamping)
+        if (!containerRef.current || !imgRef.current) return;
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const centerX = containerRect.width / 2;
+        const centerY = containerRect.height / 2;
+        const { x, y, scale } = transformRef.current;
+
+        let mapX = (centerX - x) / scale;
+        let mapY = (centerY - y) / scale;
+
+        // Force dans l'image
+        const margin = 20;
+        const imgW = imgRef.current.clientWidth;
+        const imgH = imgRef.current.clientHeight;
+        mapX = Math.max(margin, Math.min(imgW - margin, mapX));
+        mapY = Math.max(margin, Math.min(imgH - margin, mapY));
+
+        const newText: DrawingObject = {
+            id: Date.now(), tool: 'text', text: data.text, points: [], x: mapX, y: mapY,
+            color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal',
+            fontStyle: data.isItalic ? 'italic' : 'normal', thickness: 0, opacity: 1
+        };
+        setDrawings(prev => [...prev, newText]);
+        setIsTextModalOpen(false);
+        setCurrentTool('cursor');
+    };
+
+    const handleCloseModal = () => {
+        setIsTextModalOpen(false);
+        setEditingTextId(null);
+        setCurrentTool('cursor');
+    };
+
+    // --- EVENT HANDLERS ---
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1) {
+        if (e.button === 1) { // Middle Click Pan
             setIsPanning(true);
             panStartRef.current = { x: e.clientX, y: e.clientY };
             if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -151,188 +258,56 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
         const pos = getMousePos(e);
 
         if (currentTool === 'cursor') {
-            // Parcours inverse pour sélectionner l'objet le plus au-dessus
             for (let i = drawings.length - 1; i >= 0; i--) {
                 const obj = drawings[i];
 
-                // --- HIT TESTS ABILITIES ---
-                if (obj.tool === 'stun_zone') { const hit = checkBreachStunHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'breach_x_zone') { const hit = checkBreachUltHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'breach_c_zone') { const hit = checkBreachAftershockHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'wall') { const hit = checkAstraWallHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.centerStart) setWallCenterStart(hit.centerStart); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'brimstone_c_zone') { const hit = checkBrimstoneStimHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'brimstone_x_zone') { const hit = checkBrimstoneUltHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'chamber_c_zone') { const hit = checkChamberTrademarkHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'chamber_e_zone') { const hit = checkChamberRendezvousHit(pos, obj); if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; } }
-                if (obj.tool === 'cypher_c_wire') {
-                    const hit = checkCypherTrapwireHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
+                // Hit Test Texte
+                if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
+                    const fontSize = obj.fontSize || 20;
+                    const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
+                    if (pos.x >= obj.x - approxWidth / 2 && pos.x <= obj.x + approxWidth / 2 && pos.y >= obj.y - fontSize / 2 && pos.y <= obj.y + fontSize / 2) {
+                        setDraggingObjectId(obj.id); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
-                if (obj.tool === 'deadlock_q_sensor') {
-                    const hit = checkDeadlockSensorHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'cypher_q_zone') {
-                    const hit = checkCypherCageHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'deadlock_c_wall') {
-                    const hit = checkDeadlockWallHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-
-                        setSpecialDragMode(hit.mode.toString());
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'fade_x_zone') {const hit = checkFadeUltHit(pos, obj);if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; }}
-                if (obj.tool === 'fade_q_zone') {const hit = checkFadeSeizeHit(pos, obj);if (hit) {setDraggingObjectId(obj.id);setSpecialDragMode(hit.mode);if (hit.offset) setDragOffset(hit.offset);return;}}
-                if (obj.tool === 'fade_e_zone') {const hit = checkFadeHauntHit(pos, obj);if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode('center'); setDragOffset(hit.offset!); return; }}
-                if (obj.tool === 'gekko_q_wingman') {const hit = checkGekkoQHit(pos, obj);if (hit) {setDraggingObjectId(obj.id);setSpecialDragMode(hit.mode);if (hit.offset) setDragOffset(hit.offset);return;}}
-                if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) {
-                    const hit = checkIsoHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') {
-                    const hit = checkKayoHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode('center');
-                        setDragOffset(hit.offset!);
-                        return;
-                    }
-                }
-                if (obj.tool.startsWith('killjoy_')) {
-                    const hit = checkKilljoyHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'neon_c_wall' || obj.tool === 'neon_q_zone') {
-                    const hit = checkNeonHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'omen_q_zone') {
-                    const hit = checkOmenHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'raze_c_boombot') {
-                    const hit = checkRazeHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'sage_c_wall') {
-                    const hit = checkSageHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool.startsWith('sova_')) {
-                    const hit = checkSovaHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'tejo_x_zone') {
-                    const hit = checkTejoUltHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) {
-                    const hit = checkVetoHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode); // 'center'
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'viper_e_wall') {
-                    const hit = checkViperHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool.startsWith('vyse_')) {
-                    const hit = checkVyseHit(pos, obj);
-                    if (hit) {
-                        setDraggingObjectId(obj.id);
-                        setSpecialDragMode(hit.mode);
-                        if (hit.offset) setDragOffset(hit.offset);
-                        return;
-                    }
-                }
-                if (obj.tool === 'waylay_x_zone') {const hit = checkWaylayHit(pos, obj);if (hit) {setDraggingObjectId(obj.id);setSpecialDragMode(hit.mode);if (hit.offset) setDragOffset(hit.offset);return;}}
-                // --- HIT TEST IMAGES ---
+                // Hit Test Images
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = obj.width || 50; const h = obj.height || 50;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
                         setDraggingObjectId(obj.id); setSpecialDragMode(null); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
+                // Hit Test Abilities
+                const hit = checkAbilityHit(pos, obj);
+                if (hit) {
+                    setDraggingObjectId(hit.id); setSpecialDragMode(hit.mode);
+                    if (hit.offset) setDragOffset(hit.offset);
+                    if (hit.centerStart) setWallCenterStart(hit.centerStart);
+                    return;
+                }
             }
             setDraggingObjectId(null);
             return;
         }
 
-        // Logic Pen/Eraser
         if (currentTool === 'agent') {
             const newAgent: DrawingObject = { id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: 50, height: 50 };
             setDrawings(prev => [...prev, newAgent]); return;
         }
         if (currentTool === 'eraser') { setIsDrawing(true); eraseObjectAt(pos.x, pos.y); return; }
-        if (currentTool === 'pen') { setIsDrawing(true); startPosRef.current = pos; pointsRef.current = [pos]; const tempCtx = getContext(tempCanvasRef); if (tempCtx) { tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height); tempCtx.beginPath(); tempCtx.moveTo(pos.x, pos.y); } }
+
+        if (currentTool === 'pen') {
+            setIsDrawing(true);
+            const canvas = mainCanvasRef.current;
+            const x = canvas ? clamp(pos.x, 0, canvas.width) : pos.x;
+            const y = canvas ? clamp(pos.y, 0, canvas.height) : pos.y;
+            startPosRef.current = { x, y };
+            pointsRef.current = [{ x, y }];
+            const tempCtx = getContext(tempCanvasRef);
+            if (tempCtx) {
+                tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+                tempCtx.beginPath(); tempCtx.moveTo(x, y);
+            }
+        }
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -346,94 +321,45 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             panStartRef.current = { x: e.clientX, y: e.clientY };
             return;
         }
-        const pos = getMousePos(e);
 
-        if (draggingObjectId !== null && specialDragMode) {
-            const canvas = mainCanvasRef.current;
-            if (!canvas) return;
+        const rawPos = getMousePos(e);
+        const canvas = mainCanvasRef.current;
+        const pos = { x: canvas ? clamp(rawPos.x, 0, canvas.width) : rawPos.x, y: canvas ? clamp(rawPos.y, 0, canvas.height) : rawPos.y };
 
+        if (draggingObjectId !== null) {
             setDrawings(prev => prev.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
 
-                // On définit les limites
-                const limX = canvas.width;
-                const limY = canvas.height;
-
-                if (obj.tool === 'image') {
-                    return {
-                        ...obj,
-                        x: clamp(pos.x - dragOffset.x, 0, limX),
-                        y: clamp(pos.y - dragOffset.y, 0, limY)
-                    };
+                // Drag Image/Text (avec clamping objet)
+                if ((obj.tool === 'image' || obj.tool === 'text') && obj.x !== undefined) {
+                    let newX = pos.x - dragOffset.x;
+                    let newY = pos.y - dragOffset.y;
+                    if (canvas) {
+                        newX = clamp(newX, 0, canvas.width);
+                        newY = clamp(newY, 0, canvas.height);
+                    }
+                    return { ...obj, x: newX, y: newY };
                 }
-                // --- UPDATES ABILITIES ---
-                if (obj.tool === 'stun_zone') return updateBreachStunPosition(obj, pos, specialDragMode as any, dragOffset);
-                if (obj.tool === 'breach_x_zone') return updateBreachUltPosition(obj, pos, specialDragMode as any, dragOffset);
-                if (obj.tool === 'breach_c_zone') return updateBreachAftershockPosition(obj, pos, specialDragMode as any, dragOffset);
-                if (obj.tool === 'wall') return updateAstraWallPosition(obj, pos, specialDragMode as any, dragOffset, wallCenterStart);
-                if (obj.tool === 'brimstone_c_zone') return updateBrimstoneStimPosition(obj, pos, dragOffset);
-                if (obj.tool === 'brimstone_x_zone') return updateBrimstoneUltPosition(obj, pos, dragOffset);
-                if (obj.tool === 'chamber_c_zone') return updateChamberTrademarkPosition(obj, pos, dragOffset);
-                if (obj.tool === 'chamber_e_zone') return updateChamberRendezvousPosition(obj, pos, dragOffset);
-                if (obj.tool === 'cypher_q_zone') return updateCypherCagePosition(obj, pos, dragOffset);
-                if (obj.tool === 'cypher_c_wire') return updateCypherTrapwirePosition(obj, pos, specialDragMode as 'handle'|'body', dragOffset);
-                if (obj.tool === 'deadlock_c_wall') {
-                    const pointIndex = parseInt(specialDragMode as string, 10);
-                    return updateDeadlockWallPosition(obj, pos, pointIndex, dragOffset);
-                }
-                if (obj.tool === 'deadlock_q_sensor') return updateDeadlockSensorPosition(obj, pos, specialDragMode as 'center'|'rotate', dragOffset);
-                if (obj.tool === 'fade_x_zone') return updateFadeUltPosition(obj, pos, specialDragMode as any, dragOffset);
-                if (obj.tool === 'fade_q_zone') return updateFadeSeizePosition(obj, pos, dragOffset);
-                if (obj.tool === 'fade_e_zone') return updateFadeHauntPosition(obj, pos, dragOffset);
-                if (obj.tool === 'gekko_q_wingman') {return updateGekkoQPosition(obj, pos, specialDragMode as 'center'|'rotate', dragOffset);}
-                if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) {return updateIsoPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') {return updateKayoPosition(obj, pos, dragOffset);}
-                if (obj.tool.startsWith('killjoy_')) {return updateKilljoyPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'neon_c_wall' || obj.tool === 'neon_q_zone') {return updateNeonPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'omen_q_zone') {return updateOmenPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'raze_c_boombot') {return updateRazePosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'sage_c_wall') {return updateSagePosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool.startsWith('sova_')) {return updateSovaPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'tejo_x_zone') {return updateTejoUltPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) {return updateVetoPosition(obj, pos, dragOffset);}
-                if (obj.tool === 'viper_e_wall') {return updateViperPosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool.startsWith('vyse_')) {return updateVysePosition(obj, pos, specialDragMode as any, dragOffset);}
-                if (obj.tool === 'waylay_x_zone') {return updateWaylayPosition(obj, pos, specialDragMode as any, dragOffset);}
-                return obj;
-            }));
-            return;
-        }
 
-        if (draggingObjectId !== null && !specialDragMode) {
-            setDrawings(prev => prev.map(obj => {
-                if (obj.id === draggingObjectId && obj.tool === 'image') { return { ...obj, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }; }
-                return obj;
+                return updateAbilityPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart);
             }));
             return;
         }
 
         if (!isDrawing) return;
         if (currentTool === 'eraser') { eraseObjectAt(pos.x, pos.y); return; }
-        // Dessin temporaire Pen/Shape
-        if (currentTool === 'pen') {
-            const canvas = mainCanvasRef.current;
-            if (!canvas) return;
 
-            // On restreint le point aux limites du canvas
-            const clampedPos = {
-                x: clamp(pos.x, 0, canvas.width),
-                y: clamp(pos.y, 0, canvas.height)
-            };
-            pointsRef.current.push(clampedPos);
+        if (currentTool === 'pen') {
+            pointsRef.current.push(pos);
             const tempCtx = getContext(tempCanvasRef);
             if (!tempCtx || !tempCanvasRef.current) return;
             tempCtx.clearRect(0, 0, tempCanvasRef.current.width, tempCtx.canvas.height);
-            tempCtx.strokeStyle = color;
-            tempCtx.lineWidth = thickness;
-            tempCtx.lineCap = 'round';
-            tempCtx.lineJoin = 'round';
-            tempCtx.globalAlpha = opacity;
-            if (strokeType === 'dashed' || strokeType === 'dashed-arrow') { tempCtx.setLineDash([thickness * 2, thickness * 2]); } else { tempCtx.setLineDash([]); }
+            tempCtx.strokeStyle = color; tempCtx.lineWidth = thickness;
+            tempCtx.lineCap = 'round'; tempCtx.lineJoin = 'round'; tempCtx.globalAlpha = opacity;
+
+            if (strokeType === 'dashed' || strokeType === 'dashed-arrow') tempCtx.setLineDash([thickness * 2, thickness * 2]);
+            else tempCtx.setLineDash([]);
+
             if (strokeType === 'rect') {
                 tempCtx.strokeRect(startPosRef.current.x, startPosRef.current.y, pos.x - startPosRef.current.x, pos.y - startPosRef.current.y);
             } else {
@@ -464,95 +390,181 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                     id: Date.now(),
                     tool: strokeType,
                     points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current],
-                    color: color,
-                    thickness: thickness,
-                    opacity: opacity
+                    color: color, thickness: thickness, opacity: opacity
                 };
                 setDrawings(prev => [...prev, newDrawing]);
                 const tempCtx = getContext(tempCanvasRef);
-                if (tempCtx && tempCtx.canvas.width > 0 && tempCtx.canvas.height > 0) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+                if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
             }
             pointsRef.current = [];
         }
     };
 
-    const eraseObjectAt = (x: number, y: number) => {
-        const hitThreshold = 10;
-        const newDrawings = drawings.filter(obj => {
-            // Gomme Image
-            if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); }
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const { x, y, scale } = transformRef.current;
+        const finalX = (mouseX - x) / scale;
+        const finalY = (mouseY - y) / scale;
 
-            // Gomme Multi-points (Wall, Stun, Ult Breach, Aftershock, Trapwire Cypher)
-            if (obj.tool === 'wall'|| obj.tool === 'tejo_x_zone' || obj.tool ==='waylay_x_zone' || obj.tool === 'vyse_q_wall' || obj.tool ==='viper_e_wall' || obj.tool ==='sage_c_wall'|| obj.tool ==='sova_x_blast'|| obj.tool === 'stun_zone'|| obj.tool ===  'neon_c_wall' || obj.tool === 'omen_q_zone'|| obj.tool === 'fade_x_zone' ||obj.tool === 'breach_x_zone' ||obj.tool === 'gekko_q_wingman' ||obj.tool ==='raze_c_boombot'|| obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor'|| obj.tool ===  'iso_c_wall'|| obj.tool ===  'iso_q_zone'|| obj.tool ===  'iso_x_zone') {
-                const p1 = obj.points[0]; const p2 = obj.points[1];
-                if (obj.tool === 'deadlock_c_wall') {
-                    return Math.hypot(x - p1.x, y - p1.y) > 30;
+        const newDrawings = [...drawings];
+        let hasDeleted = false;
+        let deletedName = "Élément";
+
+        for (let i = newDrawings.length - 1; i >= 0; i--) {
+            const obj = newDrawings[i];
+            let hit = false;
+            if (obj.tool === 'image' && obj.x !== undefined && obj.y !== undefined) {
+                const w = obj.width || 50; const h = obj.height || 50;
+                if (finalX >= obj.x - w/2 && finalX <= obj.x + w/2 && finalY >= obj.y - h/2 && finalY <= obj.y + h/2) {
+                    hit = true; deletedName = obj.subtype === 'icon' ? 'Icône' : (obj.subtype === 'agent' ? 'Agent' : 'Compétence');
                 }
-                const midX = (p1.x + p2.x)/2; const midY = (p1.y + p2.y)/2;
-                return Math.hypot(x - p1.x, y - p1.y) > 20 && Math.hypot(x - p2.x, y - p2.y) > 20 && Math.hypot(x - midX, y - midY) > 20;
             }
-
-            // Gomme Circulaire (Brimstone, Chamber, Fade, etc.)
-            if (['brimstone_c_zone', 'veto_c_zone', 'veto_q_zone', 'vyse_x_zone', 'veto_e_zone','fade_q_zone','neon_q_zone','fade_e_zone','killjoy_q_zone', 'killjoy_x_zone','sova_e_bolt', 'killjoy_e_turret', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone', 'kayo_e_zone', 'kayo_x_zone'].includes(obj.tool as string)) {
-                const center = obj.points[0];
-                return Math.hypot(x - center.x, y - center.y) > 25;
+            else if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
+                const fontSize = obj.fontSize || 20;
+                const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
+                if (finalX >= obj.x - approxWidth / 2 && finalX <= obj.x + approxWidth / 2 && finalY >= obj.y - fontSize / 2 && finalY <= obj.y + fontSize / 2) {
+                    hit = true; deletedName = 'Texte';
+                }
             }
+            else if (!['pen', 'rect', 'arrow', 'dashed', 'dashed-arrow', 'cursor'].includes(obj.tool)) {
+                if (obj.points && obj.points.length > 0) {
+                    const center = obj.points[0];
+                    if (Math.hypot(finalX - center.x, finalY - center.y) < 30) {
+                        hit = true; deletedName = 'Compétence';
+                    }
+                }
+            }
+            if (hit) { newDrawings.splice(i, 1); hasDeleted = true; break; }
+        }
+        if (hasDeleted) { setDrawings(newDrawings); showToast(`🗑️ ${deletedName} supprimé`); }
+    };
 
-            // Gomme Traits Standards
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        const jsonData = e.dataTransfer.getData("application/json");
+        if (!jsonData) return;
+        try {
+            const { type, name } = JSON.parse(jsonData);
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const { x, y, scale } = transformRef.current;
+            const finalX = (e.clientX - rect.left - x) / scale;
+            const finalY = (e.clientY - rect.top - y) / scale;
+
+            const img = imgRef.current;
+            if (!img) return;
+            const clampedX = clamp(finalX, 0, img.clientWidth);
+            const clampedY = clamp(finalY, 0, img.clientHeight);
+            const newObj = createDrawingFromDrop(type, name, clampedX, clampedY);
+            if (newObj) { setDrawings(prev => [...prev, newObj]); setCurrentTool('cursor'); }
+        } catch (err) { console.error("Drop error", err); }
+    };
+
+    const eraseObjectAt = (x: number, y: number) => {
+        const eraserRadius = thickness / 2;
+        const newDrawings = drawings.filter(obj => {
+            const erasableTypes = ['solid', 'dashed', 'arrow', 'dashed-arrow', 'rect', 'pen'];
+            if (!erasableTypes.includes(obj.tool as string)) return true;
             if (obj.tool === 'rect' && obj.points.length >= 2) {
                 const s = obj.points[0]; const e = obj.points[1];
-                const minX = Math.min(s.x, e.x) - hitThreshold; const maxX = Math.max(s.x, e.x) + hitThreshold;
-                const minY = Math.min(s.y, e.y) - hitThreshold; const maxY = Math.max(s.y, e.y) + hitThreshold;
+                const minX = Math.min(s.x, e.x) - eraserRadius; const maxX = Math.max(s.x, e.x) + eraserRadius;
+                const minY = Math.min(s.y, e.y) - eraserRadius; const maxY = Math.max(s.y, e.y) + eraserRadius;
                 return !(x >= minX && x <= maxX && y >= minY && y <= maxY);
             }
-            const isHit = obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + hitThreshold));
-            return !isHit;
+            return !obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + eraserRadius));
         });
         if (newDrawings.length !== drawings.length) setDrawings(newDrawings);
     };
 
-    const updateTransformStyle = () => { if (contentRef.current) { const { x, y, scale } = transformRef.current; contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`; } };
-    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; };
-    useEffect(() => { const container = containerRef.current; if (!container) return; const onWheel = (e: WheelEvent) => { e.preventDefault(); const { scale, x, y } = transformRef.current; const newScale = Math.min(Math.max(0.1, scale + (e.deltaY > 0 ? -1 : 1) * 0.1 * scale), 5); const rect = container.getBoundingClientRect(); const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top; const scaleRatio = newScale / scale; const newX = mouseX - (mouseX - x) * scaleRatio; const newY = mouseY - (mouseY - y) * scaleRatio; transformRef.current = { scale: newScale, x: newX, y: newY }; updateTransformStyle(); }; container.addEventListener('wheel', onWheel, { passive: false }); return () => container.removeEventListener('wheel', onWheel); }, []);
-    const syncCanvasSize = useCallback(() => { const main = mainCanvasRef.current; const temp = tempCanvasRef.current; const img = imgRef.current; if (main && temp && img && img.clientWidth > 0) { main.width = img.clientWidth; main.height = img.clientHeight; temp.width = img.clientWidth; temp.height = img.clientHeight; redrawMainCanvas(); } }, [redrawMainCanvas]);
-    useEffect(() => { const img = imgRef.current; if (!img) return; if (img.complete && img.naturalWidth > 0) syncCanvasSize(); const onLoad = () => syncCanvasSize(); img.addEventListener('load', onLoad); const resizeObserver = new ResizeObserver(() => syncCanvasSize()); resizeObserver.observe(img); return () => { img.removeEventListener('load', onLoad); resizeObserver.disconnect(); }; }, [syncCanvasSize]);
+    const handleLoadStrategy = (strat: any) => {
+        if (strat && strat.data) setDrawings(strat.data);
+        setShowLoadModal(false);
+    };
 
-    // Calcule le style du curseur en fonction de l'outil
     const getCursorStyle = () => {
         if (isPanning) return 'grabbing';
-        if (currentTool === 'cursor') return 'default';
-
+        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') return 'default';
         if (currentTool === 'eraser') {
-            // Crée un cercle SVG pour représenter la gomme (30px de diamètre ici)
-            const size = 30;
+            const size = Math.max(thickness, 10);
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2 - 1}" fill="none" stroke="white" stroke-width="2" /><circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="none" stroke="black" stroke-width="1" /></svg>`;
             return `url('data:image/svg+xml;base64,${btoa(svg)}') ${size/2} ${size/2}, auto`;
         }
-
-        return 'crosshair'; // Pour le stylo et les agents
+        return 'crosshair';
     };
 
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; };
+
+    // Objet Texte en cours d'édition (s'il y en a un)
+    const editingObj = editingTextId ? drawings.find(d => d.id === editingTextId) : null;
+
     return (
-        <div className="flex flex-col lg:flex-row h-full w-fullbg-[#1f2326] ">
+        <div className="flex flex-col lg:flex-row h-full w-full
+          bg-[#121212]
+            bg-[linear-gradient(0deg,rgba(255,255,255,0.03),rgba(0,0,0,0.05)),
+            radial-gradient(circle_at_10%_20%,rgba(255,255,255,0.04),transparent_35%),
+            radial-gradient(circle_at_90%_80%,rgba(0,0,0,0.5),transparent_45%),
+            linear-gradient(180deg,rgba(0,0,0,0.6),transparent)]">
             <div className="absolute top-4 left-4 z-30 lg:static lg:h-full lg:w-auto lg:p-4 lg:bg-[#181b1e] lg:border-r lg:border-gray-800">
-                <ToolsSidebar currentTool={currentTool} setTool={setCurrentTool} strokeType={strokeType} setStrokeType={setStrokeType} color={color} setColor={setColor} opacity={opacity} setOpacity={setOpacity} thickness={thickness} setThickness={setThickness} selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent} onSave={() => saveStrategy(drawings)} onLoad={fetchStrategies} />
+                <ToolsSidebar
+                    currentTool={currentTool} setTool={setCurrentTool}
+                    strokeType={strokeType} setStrokeType={setStrokeType}
+                    color={color} setColor={setColor}
+                    opacity={opacity} setOpacity={setOpacity}
+                    thickness={thickness} setThickness={setThickness}
+                    selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent}
+                    onSave={() => alert("Sauvegarde automatique active !")} onLoad={fetchStrategies}
+                    showZones={showZones} setShowZones={setShowZones}
+                />
             </div>
+
             <div ref={containerRef} className="relative flex-1 w-full h-full overflow-hidden select-none" style={{ cursor: getCursorStyle() }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}>
+                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+                 onDragOver={handleDragOver} onDrop={handleDrop} onContextMenu={handleContextMenu} onDoubleClick={handleDoubleClick}>
+
                 <div ref={contentRef} className="origin-top-left absolute top-0 left-0" draggable={false}>
-                    <img ref={imgRef} src={mapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px]  p-6 h-auto bg-[#1f2326] shadow-lg" onLoad={syncCanvasSize} />
+
+                    {currentMapSrc && (
+                        <img ref={imgRef} src={currentMapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px] m-4 pr-150 p-6 h-auto  shadow-lg" onLoad={syncCanvasSize} />
+                    )}
                     <canvas ref={mainCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                     <canvas ref={tempCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                 </div>
-                <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-3 py-1 rounded-full pointer-events-none select-none backdrop-blur-sm">
-                    Molette: Zoom • Clic Molette: Pan • Glisser Agents depuis le menu
+
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white px-4 py-1 rounded-full text-sm font-medium backdrop-blur-sm pointer-events-none z-50">
+                    {!isLoaded && <span className="text-blue-400">Chargement...</span>}
+                    {isLoaded && saveStatus === 'idle' && <span className="text-gray-400">Prêt</span>}
+                    {isLoaded && saveStatus === 'saving' && <span className="text-yellow-400 flex items-center gap-2"><span className="animate-spin h-3 w-3 border-2 border-yellow-400 border-t-transparent rounded-full"></span>Sauvegarde...</span>}
+                    {isLoaded && saveStatus === 'saved' && <span className="text-green-400">☁️ Sauvegardé</span>}
                 </div>
-                <LoadModal isOpen={showLoadModal} onClose={() => setShowLoadModal(false)} isLoading={isLoading} strategies={savedStrategies} onLoadStrategy={(strat) => { if (confirm(`Charger "${strat.name}" ?`)) { setDrawings(strat.data); setShowLoadModal(false); }}} />
+
+                <LoadModal isOpen={showLoadModal} onClose={() => setShowLoadModal(false)} isLoading={isLoading} strategies={savedStrategies} onLoadStrategy={handleLoadStrategy} />
+
+                {notification && (
+                    <div className="absolute bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="bg-slate-800 text-white px-4 py-3 rounded-lg shadow-xl border border-slate-600 flex items-center gap-3">
+                            <div className="bg-red-500/20 p-1.5 rounded-full text-red-400">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                            </div>
+                            <span className="font-medium text-sm">{notification.message}</span>
+                        </div>
+                    </div>
+                )}
+
+                <TextEditorModal
+                    isOpen={isTextModalOpen}
+                    onClose={handleCloseModal}
+                    onSave={handleSaveText}
+
+                    initialText={editingObj?.text || ''}
+                    initialColor={editingObj?.color || color}
+                    initialFontSize={editingObj?.fontSize || 24}
+                    initialBold={editingObj?.fontWeight === 'bold'}
+                    initialItalic={editingObj?.fontStyle === 'italic'}
+                />
             </div>
         </div>
     );

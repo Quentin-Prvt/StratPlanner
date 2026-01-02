@@ -5,7 +5,8 @@ export const drawFadeHaunt = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    showZones: boolean
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
@@ -16,14 +17,16 @@ export const drawFadeHaunt = (
     ctx.save();
 
     // 1. Zone de Reveal
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    // Indigo plus clair et plus transparent pour le Reveal
-    ctx.fillStyle = 'rgba(129, 140, 248, 0.1)';
-    ctx.strokeStyle = '#818cf8';
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
+    if (showZones) {
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        // Indigo plus clair et plus transparent pour le Reveal
+        ctx.fillStyle = 'rgba(129, 140, 248, 0.1)';
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+    }
 
     // 2. Icône Centrale
     if (imageCache) {

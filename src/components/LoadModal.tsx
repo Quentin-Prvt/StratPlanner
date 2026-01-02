@@ -36,7 +36,6 @@ export const LoadModal = ({ isOpen, onClose, isLoading, strategies, onLoadStrate
                                 className="w-full text-left p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-[#ff4655] transition-all group"
                             >
                                 <div className="text-white font-medium group-hover:text-[#ff4655]">{strat.name}</div>
-                                <div className="text-xs text-gray-500">{new Date(strat.created_at).toLocaleDateString()}</div>
                             </button>
                         ))
                     )}

@@ -8,7 +8,8 @@ export const drawBrimstoneStim = (
     obj: DrawingObject,
     // On met un type explicite et une valeur par défaut pour éviter le crash si oublié
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    showZones: boolean
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
@@ -17,20 +18,21 @@ export const drawBrimstoneStim = (
     ctx.save();
 
     // 1. Zone d'effet
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(251, 146, 60, 0.3)';
-    ctx.strokeStyle = '#f97316';
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
+    if (showZones) {
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(251, 146, 60, 0.3)';
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius * 0.95, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius * 0.95, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
     // 2. Logo Central
     ctx.translate(center.x, center.y);
 

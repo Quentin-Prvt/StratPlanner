@@ -1,5 +1,5 @@
 
-export type ToolType = 'pen' | 'eraser' | 'cursor' | 'agent' | 'ability' | 'wall' | null;
+export type ToolType = 'pen' | 'eraser' | 'cursor' | 'image' | 'text' | string ;
 
 export type StrokeType =
     | 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect'
@@ -28,36 +28,32 @@ export type StrokeType =
 
 export interface DrawingObject {
     id: number;
-    tool: StrokeType | 'image';
-    subtype?: 'agent' | 'ability';
-    points: { x: number, y: number }[];
+    tool: ToolType;
+    subtype?: string; // 'agent', 'ability', 'icon'
+    points: { x: number; y: number }[];
     color: string;
     thickness: number;
     opacity: number;
+
+    // Pour les images / icons
     imageSrc?: string;
     x?: number;
     y?: number;
     width?: number;
     height?: number;
-}
-export interface DrawingObject {
-    id: number;
-    tool: StrokeType | 'image';
-    subtype?: 'agent' | 'ability';
-    points: { x: number, y: number }[];
-    color: string;
-    thickness: number;
-    opacity: number;
-    imageSrc?: string;
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
+    rotation?: number;
+
+    // NOUVEAU : Pour le texte
+    text?: string;
+    fontSize?: number;
+    fontWeight?: string;
+    fontStyle?: string;
 }
 
 export interface StrategyRecord {
-    id: string;
+    id: number;
     name: string;
+    map_name: string;
     data: DrawingObject[];
-    created_at: string;
+    created_at?: string;
 }

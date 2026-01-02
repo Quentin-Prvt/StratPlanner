@@ -10,22 +10,22 @@ const getIsoConfig = (tool: string) => {
             return {
                 width: ABILITY_SIZES['iso_c_width'] || 120,
                 length: ABILITY_SIZES['iso_c_length'] || 400,
-                color: 'rgba(139, 92, 246, 0.4)', // Violet Wall
+                color: 'rgba(139, 92, 246, 0.4)',
                 stroke: '#8b5cf6'
             };
         case 'iso_q_zone':
             return {
                 width: ABILITY_SIZES['iso_q_width'] || 80,
                 length: ABILITY_SIZES['iso_q_length'] || 500,
-                color: 'rgba(76, 29, 149, 0.4)', // Violet Foncé (Undercut)
-                stroke: '#6d28d9'
+                color: 'rgba(139, 92, 246, 0.4)',
+                stroke: '#8b5cf6'
             };
         case 'iso_x_zone':
             return {
                 width: ABILITY_SIZES['iso_x_width'] || 300,
                 length: ABILITY_SIZES['iso_x_length'] || 800,
-                color: 'rgba(59, 130, 246, 0.3)', // Bleu/Violet (Ult)
-                stroke: '#3b82f6'
+                color: 'rgba(139, 92, 246, 0.4)',
+                stroke: '#8b5cf6'
             };
         default:
             return { width: 100, length: 100, color: 'gray', stroke: 'white' };

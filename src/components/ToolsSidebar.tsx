@@ -1,14 +1,15 @@
 import React from 'react';
 import {
     Pencil, Eraser, Minus, MoveUpRight, Square,
-    Hand, Save, FolderOpen, MousePointer2
+    Hand, MousePointer2, Settings, Hammer, Type // <--- AJOUT DE L'ICÔNE TYPE
 } from 'lucide-react';
 
 import type { ToolType, StrokeType } from '../types/canvas';
 
 interface ToolsSidebarProps {
-    currentTool: ToolType;
-    setTool: (t: ToolType) => void;
+    // J'ai ajouté 'text' ici pour éviter les erreurs TypeScript
+    currentTool: ToolType | 'tools' | 'settings' | 'text'| null;
+    setTool: (t: ToolType | 'tools' | 'settings' | 'text'| null) => void;
     strokeType: StrokeType;
     setStrokeType: (t: StrokeType) => void;
     color: string;
@@ -21,6 +22,8 @@ interface ToolsSidebarProps {
     setSelectedAgent: (a: string) => void;
     onSave: () => void;
     onLoad: () => void;
+    showZones: boolean;
+    setShowZones: (b: boolean) => void;
 }
 
 export const ToolsSidebar = ({
@@ -30,7 +33,7 @@ export const ToolsSidebar = ({
                                  opacity, setOpacity,
                                  thickness, setThickness,
                                  selectedAgent, setSelectedAgent,
-                                 onSave, onLoad
+                                 showZones, setShowZones
                              }: ToolsSidebarProps) => {
 
     const colors = [
@@ -48,12 +51,33 @@ export const ToolsSidebar = ({
 
     const abilities = ['c', 'q', 'e', 'x'];
 
-    const handleToolClick = (tool: ToolType) => {
+    // --- LISTE DES OUTILS / EMOJIS ---
+    const mapIcons = [
+        { id: 'danger', label: 'Danger', src: '/icons/danger.png' },
+        { id: 'star', label: 'Important', src: '/icons/star.png' },
+        { id: 'target', label: 'Cible', src: '/icons/target.png' },
+        { id: 'spike', label: 'Spike', src: '/icons/spike.png' },
+    ];
+
+    const handleToolClick = (tool: any) => {
         if (currentTool === tool) setTool(null);
         else setTool(tool);
     };
 
-    const handleDragStart = (e: React.DragEvent, type: 'agent' | 'ability', name: string) => {
+    const activatePen = () => {
+        setTool('pen');
+        if (thickness > 30) setThickness(4);
+    };
+
+    const activateEraser = () => {
+        setTool('eraser');
+        if (thickness < 10) setThickness(30);
+    };
+
+    const isDrawingMode = currentTool === 'pen' || currentTool === 'eraser';
+
+    // J'ai élargi le type pour accepter 'icon'
+    const handleDragStart = (e: React.DragEvent, type: 'agent' | 'ability' | 'icon', name: string) => {
         const dragData = JSON.stringify({ type, name });
         e.dataTransfer.setData("application/json", dragData);
         e.dataTransfer.effectAllowed = "copy";
@@ -61,26 +85,24 @@ export const ToolsSidebar = ({
         if (type === 'agent') {
             setSelectedAgent(name);
             setTool('agent');
-        } else {
+        } else if (type === 'ability') {
             setTool('ability');
         }
+        // Pour 'icon', on laisse le drop handler gérer
     };
 
     return (
         <div className="flex flex-col gap-4 p-4 bg-[#1e293b] rounded-xl border border-gray-700 shadow-xl w-full lg:w-72 text-white overflow-y-auto max-h-full pointer-events-auto">
             <div className="flex justify-between items-center mb-1">
-                <h2 className="text-xl font-bold">Outils</h2>
-                <div className="flex gap-2">
-                    <button onClick={onSave} title="Sauvegarder" className="p-2 hover:bg-slate-700 rounded text-green-400 border border-transparent hover:border-green-400/30 transition-all"><Save size={20} /></button>
-                    <button onClick={onLoad} title="Charger" className="p-2 hover:bg-slate-700 rounded text-blue-400 border border-transparent hover:border-blue-400/30 transition-all"><FolderOpen size={20} /></button>
-                </div>
+                <h2 className="text-xl font-bold">Éditeur</h2>
             </div>
 
+            {/* GRILLE PRINCIPALE */}
             <div className="grid grid-cols-4 gap-2 mb-2">
                 <ToolButton active={currentTool === 'cursor'} onClick={() => handleToolClick('cursor')} icon={<MousePointer2 size={20} />} title="Déplacer" />
-                <ToolButton active={currentTool === 'pen'} onClick={() => handleToolClick('pen')} icon={<Pencil size={20} />} title="Dessiner" />
-                <ToolButton active={currentTool === 'eraser'} onClick={() => handleToolClick('eraser')} icon={<Eraser size={20} />} title="Gomme" />
-                <ToolButton active={currentTool === 'agent'} onClick={() => handleToolClick('agent')} icon={<span className="font-bold text-lg">A</span>} title="Placer Agent" />
+                <ToolButton active={isDrawingMode} onClick={() => handleToolClick('pen')} icon={<Pencil size={20} />} title="Dessiner" />
+                <ToolButton active={currentTool === 'tools' || currentTool === 'text'} onClick={() => handleToolClick('tools')} icon={<Hammer size={20} />} title="Outils" />
+                <ToolButton active={currentTool === 'settings'} onClick={() => handleToolClick('settings')} icon={<Settings size={20} />} title="Paramètres" />
             </div>
 
             {currentTool === null && (
@@ -90,7 +112,129 @@ export const ToolsSidebar = ({
                 </div>
             )}
 
-            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-300">
+            {/* MENU DESSINER */}
+            {isDrawingMode && (
+                <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-300 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                    <div className="flex bg-slate-900 p-1 rounded-lg">
+                        <button onClick={activatePen} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm transition-all ${currentTool === 'pen' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+                            <Pencil size={14} /> Crayon
+                        </button>
+                        <button onClick={activateEraser} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm transition-all ${currentTool === 'eraser' ? 'bg-red-500 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+                            <Eraser size={14} /> Gomme
+                        </button>
+                    </div>
+
+                    {currentTool === 'pen' && (
+                        <>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-medium w-12 text-gray-400">Style</span>
+                                <div className="grid grid-cols-5 gap-1 flex-1">
+                                    <SmallButton active={strokeType === 'solid'} onClick={() => setStrokeType('solid')} icon={<Minus size={16} className="-rotate-45" />} />
+                                    <SmallButton active={strokeType === 'dashed'} onClick={() => setStrokeType('dashed')} icon={<Minus size={16} className="border-dashed border-b-2 border-current w-4 h-0" />} />
+                                    <SmallButton active={strokeType === 'arrow'} onClick={() => setStrokeType('arrow')} icon={<MoveUpRight size={16} />} />
+                                    <SmallButton active={strokeType === 'dashed-arrow'} onClick={() => setStrokeType('dashed-arrow')} icon={<MoveUpRight size={16} className="opacity-75" />} />
+                                    <SmallButton active={strokeType === 'rect'} onClick={() => setStrokeType('rect')} icon={<Square size={16} />} />
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <span className="text-xs font-medium w-12 pt-1 text-gray-400">Couleur</span>
+                                <div className="flex flex-wrap gap-2 flex-1">
+                                    {colors.map((c) => (
+                                        <button key={c} onClick={() => setColor(c)} className={`w-5 h-5 rounded border transition-transform hover:scale-110 ${color === c ? 'border-white ring-2 ring-blue-500' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="space-y-3 pt-2 border-t border-slate-700/50">
+                        {currentTool === 'pen' && (
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-medium w-12 text-gray-400">Opacité</span>
+                                <input type="range" min="0.1" max="1" step="0.1" value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="flex-1 h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]" />
+                            </div>
+                        )}
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-medium w-12 text-gray-400">Taille</span>
+                            <div className="flex-1 flex items-center gap-2">
+                                <input
+                                    type="range"
+                                    min={currentTool === 'eraser' ? 10 : 1}
+                                    max={currentTool === 'eraser' ? 200 : 30}
+                                    value={thickness}
+                                    onChange={(e) => setThickness(parseInt(e.target.value))}
+                                    className="flex-1 h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]"
+                                />
+                                <span className="text-xs text-gray-300 w-8 text-right">{thickness}px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MENU OUTILS (NOUVEAU) --- */}
+            {(currentTool === 'tools' || currentTool === 'text') && (
+                <div className="animate-in fade-in slide-in-from-left-4 duration-300 bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-3">
+                    <span className="text-sm font-medium text-gray-400 border-b border-gray-700 pb-2">Outils tactiques</span>
+
+                    {/* ZONE DE TEXTE */}
+                    <button
+                        onClick={() => setTool('text')}
+                        className={`flex items-center justify-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                            currentTool === 'text' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-gray-300 hover:bg-slate-700 hover:text-white'
+                        }`}
+                    >
+                        <Type size={18} /> Zone de Texte
+                    </button>
+
+                    {/* EMOJIS / OBJETS (DRAGGABLE) */}
+                    <div className="flex flex-col gap-2 mt-1">
+                        <span className="text-xs font-medium text-gray-500 uppercase">Objets (Glisser-déposer)</span>
+                        <div className="grid grid-cols-4 gap-2">
+                            {mapIcons.map((icon) => (
+                                <div
+                                    key={icon.id}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, 'icon', icon.id)}
+                                    className="aspect-square bg-slate-900 p-2 rounded-lg border border-slate-700 hover:border-blue-500 hover:bg-slate-800 cursor-grab active:cursor-grabbing transition-all flex items-center justify-center group relative"
+                                    title={icon.label}
+                                >
+                                    <img
+                                        src={icon.src}
+                                        alt={icon.label}
+                                        className="w-full h-full object-contain pointer-events-none drop-shadow-md"
+                                        onError={(e) => {e.currentTarget.style.display = 'none'}}
+                                    />
+                                    {/* Tooltip au survol */}
+                                    <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                        {icon.label}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MENU PARAMÈTRES */}
+            {currentTool === 'settings' && (
+                <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-left-4 duration-300 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                    <span className="text-sm font-medium text-gray-400 border-b border-gray-700 pb-2">Affichage</span>
+
+                    <button
+                        onClick={() => setShowZones(!showZones)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded transition-colors ${
+                            showZones ? 'bg-gray-700 text-white' : 'bg-slate-900 text-gray-400 hover:bg-slate-700'
+                        }`}
+                    >
+                        <span className="text-xs font-bold uppercase">Zones de portée</span>
+                        <div className={`w-3 h-3 rounded-full transition-all ${showZones ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-gray-600'}`} />
+                    </button>
+                </div>
+            )}
+
+            {/* AGENTS & COMPETENCES (Toujours visibles) */}
+            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-300 mt-2">
                 <span className="text-sm font-medium text-gray-400">Compétences ({selectedAgent})</span>
                 <div className="grid grid-cols-4 gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
                     {abilities.map(key => (
@@ -138,47 +282,15 @@ export const ToolsSidebar = ({
                     ))}
                 </div>
             </div>
-
-            {currentTool === 'pen' && (
-                <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-left-4 duration-300 mt-2 pt-4 border-t border-gray-700">
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium w-16">Type</span>
-                        <div className="grid grid-cols-5 gap-1 flex-1">
-                            <SmallButton active={strokeType === 'solid'} onClick={() => setStrokeType('solid')} icon={<Minus size={16} className="-rotate-45" />} />
-                            <SmallButton active={strokeType === 'dashed'} onClick={() => setStrokeType('dashed')} icon={<Minus size={16} className="border-dashed border-b-2 border-current w-4 h-0" />} />
-                            <SmallButton active={strokeType === 'arrow'} onClick={() => setStrokeType('arrow')} icon={<MoveUpRight size={16} />} />
-                            <SmallButton active={strokeType === 'dashed-arrow'} onClick={() => setStrokeType('dashed-arrow')} icon={<MoveUpRight size={16} className="opacity-75" />} />
-                            <SmallButton active={strokeType === 'rect'} onClick={() => setStrokeType('rect')} icon={<Square size={16} />} />
-                        </div>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                        <span className="text-sm font-medium w-16 pt-1">Couleur</span>
-                        <div className="flex flex-wrap gap-2 flex-1">
-                            {colors.map((c) => (
-                                <button key={c} onClick={() => setColor(c)} className={`w-6 h-6 rounded border transition-transform hover:scale-110 ${color === c ? 'border-white ring-2 ring-blue-500' : 'border-transparent'}`} style={{ backgroundColor: c }} />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium w-16">Opacité</span>
-                        <input type="range" min="0.1" max="1" step="0.1" value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]" />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium w-16">Taille</span>
-                        <input type="range" min="2" max="20" value={thickness} onChange={(e) => setThickness(parseInt(e.target.value))} className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-[#0ea5e9]" />
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
 
+// Utils
 const ToolButton = ({ active, onClick, icon, title }: { active: boolean, onClick: () => void, icon: React.ReactNode, title?: string }) => (
     <button onClick={onClick} title={title} className={`p-3 rounded-lg flex items-center justify-center transition-all ${active ? 'bg-[#0ea5e9] text-white shadow-lg shadow-blue-900/50' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{icon}</button>
 );
 
 const SmallButton = ({ active, onClick, icon, title }: { active: boolean, onClick: () => void, icon: React.ReactNode, title?: string }) => (
-    <button onClick={onClick} title={title} className={`w-9 h-9 rounded flex items-center justify-center transition-all ${active ? 'bg-[#0ea5e9] text-white' : 'bg-slate-700 hover:bg-slate-600 text-gray-400'}`}>{icon}</button>
+    <button onClick={onClick} title={title} className={`w-8 h-8 rounded flex items-center justify-center transition-all ${active ? 'bg-[#0ea5e9] text-white' : 'bg-slate-700 hover:bg-slate-600 text-gray-400'}`}>{icon}</button>
 );

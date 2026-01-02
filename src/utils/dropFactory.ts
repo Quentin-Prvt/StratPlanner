@@ -2,7 +2,6 @@ import type {DrawingObject, StrokeType} from '../types/canvas';
 import {ABILITY_SIZES} from './abilitySizes';
 
 export const createDrawingFromDrop = (
-
     type: string,
     name: string,
     x: number,
@@ -10,7 +9,11 @@ export const createDrawingFromDrop = (
 ): DrawingObject | null => {
     const id = Date.now();
 
-    // --- 1. ASTRA ---
+    // =========================================================================
+    // 1. GESTION DES COMPÉTENCES SPÉCIFIQUES (Zones, Murs, Lignes...)
+    // =========================================================================
+
+    // --- ASTRA ---
     if (name === 'astra_x') return {
         id,
         tool: 'wall',
@@ -21,7 +24,7 @@ export const createDrawingFromDrop = (
         opacity: 0.8
     };
 
-    // --- 2. BREACH ---
+    // --- BREACH ---
     if (name === 'breach_e') return {
         id,
         tool: 'stun_zone',
@@ -50,7 +53,7 @@ export const createDrawingFromDrop = (
         opacity: 0.8
     };
 
-    // --- 3. BRIMSTONE ---
+    // --- BRIMSTONE ---
     if (name === 'brimstone_c') return {
         id,
         tool: 'brimstone_c_zone',
@@ -70,7 +73,7 @@ export const createDrawingFromDrop = (
         opacity: 0.8
     };
 
-    // --- 4. CHAMBER ---
+    // --- CHAMBER ---
     if (name === 'chamber_c') return {
         id,
         tool: 'chamber_c_zone',
@@ -89,47 +92,48 @@ export const createDrawingFromDrop = (
         thickness: 0,
         opacity: 0.8
     };
-    if (name === 'cypher_c') {
-        // On commence avec une petite longueur, l'utilisateur l'étendra
-        const initialLength = 50;
 
+    // --- CYPHER ---
+    if (name === 'cypher_c') {
+        const initialLength = 50;
         return {
             id,
             tool: 'cypher_c_wire',
             subtype: 'ability',
             points: [
-                {x: x, y: y}, // P1 (Ancre) sous la souris
-                {x: x + initialLength, y: y} // P2 (Poignée) à droite
+                {x: x, y: y},
+                {x: x + initialLength, y: y}
             ],
             color: '#22d3ee',
             thickness: 2,
             opacity: 0.8
         };
     }
-
     if (name === 'cypher_q') {
         return {
             id,
             tool: 'cypher_q_zone',
             subtype: 'ability',
-            points: [{x, y}], // Un seul point central
-            color: '#22d3ee', // Cyan
+            points: [{x, y}],
+            color: '#22d3ee',
             thickness: 0,
             opacity: 0.8
         };
     }
+
+    // --- DEADLOCK ---
     if (name === 'deadlock_c') {
         const r = ABILITY_SIZES['deadlock_c_radius'] || 150;
         return {
             id,
-            tool: 'deadlock_c_wall', // Nouveau nom
+            tool: 'deadlock_c_wall',
             subtype: 'ability',
             points: [
-                {x, y},                // P0: Centre
-                {x: x + r, y: y},      // P1: Droite (0°)
-                {x: x, y: y + r},      // P2: Bas (90°)
-                {x: x - r, y: y},      // P3: Gauche (180°)
-                {x: x, y: y - r}       // P4: Haut (270°)
+                {x, y},
+                {x: x + r, y: y},
+                {x: x, y: y + r},
+                {x: x - r, y: y},
+                {x: x, y: y - r}
             ],
             color: '#22d3ee',
             thickness: 4,
@@ -143,24 +147,23 @@ export const createDrawingFromDrop = (
             tool: 'deadlock_q_sensor',
             subtype: 'ability',
             points: [
-                {x, y},            // Centre
-                {x: x + len, y}    // Poignée (direction par défaut : droite)
+                {x, y},
+                {x: x + len, y}
             ],
             color: '#22d3ee',
             thickness: 2,
             opacity: 0.8
         };
     }
+
+    // --- FADE ---
     if (name === 'fade_x') {
         const length = 470;
         return {
             id,
             tool: 'fade_x_zone',
             subtype: 'ability',
-            points: [
-                {x, y},
-                {x: x + length, y}
-            ],
+            points: [{x, y}, {x: x + length, y}],
             color: '#6366f1',
             thickness: 0,
             opacity: 0.8
@@ -190,26 +193,26 @@ export const createDrawingFromDrop = (
             imageSrc: 'fade_e_icon'
         };
     }
+
+    // --- GEKKO ---
     if (name === 'gekko_q') {
         const handleDist = ABILITY_SIZES['gekko_q_handle_dist'] || 60;
         return {
             id,
-            tool: 'gekko_q_wingman', // Nouveau tool
+            tool: 'gekko_q_wingman',
             subtype: 'ability',
-            // P1 au centre, P2 vers le haut par défaut (car l'image regarde vers le haut)
             points: [{x, y}, {x, y: y - handleDist}],
-            imageSrc: 'gekko_q_game', // Nom de ton image
+            imageSrc: 'gekko_q_game',
             color: '#fda4af',
             thickness: 0,
             opacity: 1
         };
     }
+
+    // --- ISO ---
     if (['iso_c', 'iso_q', 'iso_x'].includes(name)) {
         let length = 400;
-
-
         let toolName: StrokeType = 'iso_c_wall';
-
         let color = '#8b5cf6';
 
         if (name === 'iso_c') {
@@ -218,7 +221,7 @@ export const createDrawingFromDrop = (
         }
         if (name === 'iso_q') {
             length = ABILITY_SIZES['iso_q_length'] || 500;
-            toolName = 'iso_q_zone'; // TypeScript acceptera car c'est une valeur valide de StrokeType
+            toolName = 'iso_q_zone';
             color = '#6d28d9';
         }
         if (name === 'iso_x') {
@@ -231,30 +234,33 @@ export const createDrawingFromDrop = (
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}, {x: x + length, y}], // P1 et P2 (horizontal)
+            points: [{x, y}, {x: x + length, y}],
             color: color,
             thickness: 0,
             opacity: 0.6
         };
     }
+
+    // --- KAY/O ---
     if (name === 'kayo_e' || name === 'kayo_x') {
         const isUlt = name === 'kayo_x';
         const toolName: StrokeType = isUlt ? 'kayo_x_zone' : 'kayo_e_zone';
-        const color = isUlt ? '#06b6d4' : '#22d3ee'; // Cyan
+        const color = isUlt ? '#06b6d4' : '#22d3ee';
 
         return {
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}], // Un seul point central
+            points: [{x, y}],
             color: color,
             thickness: 0,
             opacity: 0.7,
-            imageSrc: `${name}_icon` // ex: kayo_e_icon
+            imageSrc: `${name}_icon`
         };
     }
+
+    // --- KILLJOY ---
     if (name.startsWith('killjoy_')) {
-        // E - Tourelle (Orientable)
         if (name === 'killjoy_e') {
             const dist = ABILITY_SIZES['killjoy_e_handle_dist'] || 60;
             const toolName: StrokeType = 'killjoy_e_turret';
@@ -263,13 +269,12 @@ export const createDrawingFromDrop = (
                 tool: toolName,
                 subtype: 'ability',
                 points: [{x, y}, {x, y: y - dist}],
-                imageSrc: 'killjoy_e_game', // Assure-toi d'avoir cette image
+                imageSrc: 'killjoy_e_game',
                 color: '#eab308',
                 thickness: 0,
                 opacity: 1
             };
         }
-        // Q & X (Circulaire)
         let toolName: StrokeType = 'killjoy_q_zone';
         let color = '#eab308';
         if (name === 'killjoy_x') {
@@ -287,6 +292,8 @@ export const createDrawingFromDrop = (
             opacity: 0.6
         };
     }
+
+    // --- NEON ---
     if (name.startsWith('neon_')) {
         if (name === 'neon_c') {
             const length = ABILITY_SIZES['neon_c_length'] || 600;
@@ -315,8 +322,9 @@ export const createDrawingFromDrop = (
             };
         }
     }
+
+    // --- OMEN ---
     if (name.startsWith('omen_')) {
-        // Q - Paranoïa
         if (name === 'omen_q') {
             const length = ABILITY_SIZES['omen_q_length'] || 600;
             const toolName: StrokeType = 'omen_q_zone';
@@ -324,13 +332,15 @@ export const createDrawingFromDrop = (
                 id,
                 tool: toolName,
                 subtype: 'ability',
-                points: [{x, y}, {x: x + length, y}], // P1 et P2
+                points: [{x, y}, {x: x + length, y}],
                 color: '#8b5cf6',
                 thickness: 0,
                 opacity: 0.7
             };
         }
     }
+
+    // --- RAZE ---
     if (name === 'raze_c') {
         const dist = ABILITY_SIZES['raze_c_handle_dist'] || 60;
         const toolName: StrokeType = 'raze_c_boombot';
@@ -338,30 +348,32 @@ export const createDrawingFromDrop = (
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}, {x, y: y - dist}], // P1 et P2
+            points: [{x, y}, {x, y: y - dist}],
             imageSrc: 'raze_c_game',
             color: '#f97316',
             thickness: 0,
             opacity: 1
         };
     }
+
+    // --- SAGE ---
     if (name === 'sage_c') {
         const dist = ABILITY_SIZES['sage_c_handle_dist'] || 70;
         const toolName: StrokeType = 'sage_c_wall';
-
         return {
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}, {x, y: y - dist}], // P1 et P2
-            imageSrc: 'sage_c_game', // Assurez-vous d'avoir cette image
+            points: [{x, y}, {x, y: y - dist}],
+            imageSrc: 'sage_c_game',
             color: '#2dd4bf',
             thickness: 0,
             opacity: 1
         };
     }
+
+    // --- SOVA ---
     if (name.startsWith('sova_')) {
-        // E - Recon (Rond avec Icone)
         if (name === 'sova_e') {
             const toolName: StrokeType = 'sova_e_bolt';
             return {
@@ -376,8 +388,6 @@ export const createDrawingFromDrop = (
             };
         }
     }
-
-    // X - Hunter's Fury (Rectangle Directionnel)
     if (name === 'sova_x') {
         const length = ABILITY_SIZES['sova_x_length'] || 900;
         const toolName: StrokeType = 'sova_x_blast';
@@ -385,16 +395,17 @@ export const createDrawingFromDrop = (
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}, {x: x + length, y}], // P1 et P2
+            points: [{x, y}, {x: x + length, y}],
             color: '#3b82f6',
             thickness: 0,
             opacity: 0.6
         };
     }
+
+    // --- TEJO ---
     if (name === 'tejo_x') {
         const length = ABILITY_SIZES['tejo_x_length'] || 650;
         const toolName: StrokeType = 'tejo_x_zone';
-
         return {
             id,
             tool: toolName,
@@ -405,13 +416,11 @@ export const createDrawingFromDrop = (
             opacity: 0.6
         };
     }
-    if (name.startsWith('veto_')) {
-        // C, Q, E -> Zones Circulaires
-        if (['veto_c', 'veto_q', 'veto_e'].includes(name)) {
-            // Astuce pour générer le nom du tool dynamiquement : veto_c_zone, veto_q_zone...
-            const toolName = `${name}_zone` as StrokeType;
 
-            // Couleurs par défaut (seront surchargées par le dessinateur, mais utiles ici)
+    // --- VETO ---
+    if (name.startsWith('veto_')) {
+        if (['veto_c', 'veto_q', 'veto_e'].includes(name)) {
+            const toolName = `${name}_zone` as StrokeType;
             let color = '#ef4444';
             if (name === 'veto_q') color = '#a855f7';
             if (name === 'veto_e') color = '#ec4899';
@@ -421,29 +430,31 @@ export const createDrawingFromDrop = (
                 tool: toolName,
                 subtype: 'ability',
                 points: [{x, y}],
-                imageSrc: `${name}_icon`, // ex: veto_c_icon
+                imageSrc: `${name}_icon`,
                 color: color,
                 thickness: 0,
                 opacity: 0.6
             };
         }
     }
+
+    // --- VIPER ---
     if (name === 'viper_e') {
         const length = ABILITY_SIZES['viper_e_length'] || 1200;
         const handleDist = length / 2;
-
         const toolName: StrokeType = 'viper_e_wall';
-
         return {
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}, {x: x + handleDist, y}], // P1 et P2
+            points: [{x, y}, {x: x + handleDist, y}],
             color: '#65a30d',
             thickness: 0,
             opacity: 0.7
         };
     }
+
+    // --- VYSE ---
     if (name.startsWith('vyse_')) {
         if (name === 'vyse_q') {
             const length = ABILITY_SIZES['vyse_q_length'] || 450;
@@ -454,7 +465,7 @@ export const createDrawingFromDrop = (
                 tool: toolName,
                 subtype: 'ability',
                 points: [{x, y}, {x: x + handleDist, y}],
-                color: '#6b7280', // Gris Métal
+                color: '#6b7280',
                 thickness: 0,
                 opacity: 0.7
             };
@@ -467,29 +478,52 @@ export const createDrawingFromDrop = (
                 subtype: 'ability',
                 points: [{x, y}],
                 imageSrc: 'vyse_x_icon',
-                color: '#a855f7', // Violet
+                color: '#a855f7',
                 thickness: 0,
                 opacity: 0.6
             };
         }
     }
+
+    // --- WAYLAY ---
     if (name === 'waylay_x') {
         const length = ABILITY_SIZES['waylay_x_length'] || 600;
         const toolName: StrokeType = 'waylay_x_zone';
-
         return {
             id,
             tool: toolName,
             subtype: 'ability',
-            points: [{x, y}, {x: x + length, y}], // P1 et P2
-            color: '#d97706', // Ambre
+            points: [{x, y}, {x: x + length, y}],
+            color: '#d97706',
             thickness: 0,
             opacity: 0.6
         };
     }
 
 
-    // --- 5. IMAGES GÉNÉRIQUES (Agents, Smokes, Mollys, Icons) ---
+    // =========================================================================
+    // 2. GESTION DES ICÔNES DROPPABLES (Danger, Star, Target, Spike...)
+    // =========================================================================
+    // C'est ici que l'on ajoute le nouveau type
+    if (type === 'icon') {
+        return {
+            id,
+            tool: 'image',
+            subtype: 'icon',
+            points: [],
+            x, y,
+            width: 40, // Taille standard pour une icône
+            height: 40,
+            imageSrc: `/icons/${name}.png`, // ex: /icons/danger.png
+            color: '#ffffff',
+            thickness: 0,
+            opacity: 1
+        };
+    }
+
+    // =========================================================================
+    // 3. GESTION PAR DÉFAUT : IMAGES GÉNÉRIQUES (Agents, Spells simples)
+    // =========================================================================
 
     // Liste des sorts qui utilisent l'image "_icon"
     const useIconFile = ['breach_q',

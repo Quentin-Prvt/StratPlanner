@@ -5,7 +5,8 @@ export const drawFadeSeize = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    showZones: boolean
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
@@ -17,14 +18,15 @@ export const drawFadeSeize = (
     ctx.save();
 
     // 1. Zone d'effet
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(79, 70, 229, 0.25)';
-    ctx.strokeStyle = '#6366f1';
-    ctx.lineWidth = 3;
-    ctx.fill();
-    ctx.stroke();
-
+    if (showZones) {
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(79, 70, 229, 0.25)';
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 3;
+        ctx.fill();
+        ctx.stroke();
+    }
     // Bordure stylisée intérieure
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius * 0.92, 0, Math.PI * 2);
