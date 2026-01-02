@@ -25,7 +25,13 @@ import { checkDeadlockSensorHit, updateDeadlockSensorPosition } from '../utils/a
 import { checkFadeUltHit, updateFadeUltPosition } from '../utils/abilities/fadeUlt';
 import { checkFadeSeizeHit, updateFadeSeizePosition } from '../utils/abilities/fadeSeize.ts';
 import { checkFadeHauntHit, updateFadeHauntPosition } from '../utils/abilities/fadeHaunt';
-
+import { checkGekkoQHit, updateGekkoQPosition} from "../utils/abilities/gekkoQ.ts";
+import { checkIsoHit, updateIsoPosition } from '../utils/abilities/isoAbilities';
+import { checkKayoHit, updateKayoPosition } from '../utils/abilities/kayoAbilities';
+import { checkKilljoyHit, updateKilljoyPosition } from '../utils/abilities/killjoyAbilities';
+import { checkNeonHit, updateNeonPosition } from '../utils/abilities/neonAbilities';
+import { checkOmenHit, updateOmenPosition } from '../utils/abilities/omenAbilities';
+import { checkRazeHit, updateRazePosition } from '../utils/abilities/razeAbilities';
 
 interface EditorCanvasProps {
     mapSrc: string;
@@ -191,7 +197,61 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                 if (obj.tool === 'fade_x_zone') {const hit = checkFadeUltHit(pos, obj);if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode(hit.mode); if (hit.offset) setDragOffset(hit.offset); return; }}
                 if (obj.tool === 'fade_q_zone') {const hit = checkFadeSeizeHit(pos, obj);if (hit) {setDraggingObjectId(obj.id);setSpecialDragMode(hit.mode);if (hit.offset) setDragOffset(hit.offset);return;}}
                 if (obj.tool === 'fade_e_zone') {const hit = checkFadeHauntHit(pos, obj);if (hit) { setDraggingObjectId(obj.id); setSpecialDragMode('center'); setDragOffset(hit.offset!); return; }}
-
+                if (obj.tool === 'gekko_q_wingman') {const hit = checkGekkoQHit(pos, obj);if (hit) {setDraggingObjectId(obj.id);setSpecialDragMode(hit.mode);if (hit.offset) setDragOffset(hit.offset);return;}}
+                if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) {
+                    const hit = checkIsoHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') {
+                    const hit = checkKayoHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode('center');
+                        setDragOffset(hit.offset!);
+                        return;
+                    }
+                }
+                if (obj.tool.startsWith('killjoy_')) {
+                    const hit = checkKilljoyHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool === 'neon_c_wall' || obj.tool === 'neon_q_zone') {
+                    const hit = checkNeonHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool === 'omen_q_zone') {
+                    const hit = checkOmenHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
+                if (obj.tool === 'raze_c_boombot') {
+                    const hit = checkRazeHit(pos, obj);
+                    if (hit) {
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(hit.mode);
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return;
+                    }
+                }
                 // --- HIT TEST IMAGES ---
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = obj.width || 50; const h = obj.height || 50;
@@ -263,6 +323,14 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
                 if (obj.tool === 'fade_x_zone') return updateFadeUltPosition(obj, pos, specialDragMode as any, dragOffset);
                 if (obj.tool === 'fade_q_zone') return updateFadeSeizePosition(obj, pos, dragOffset);
                 if (obj.tool === 'fade_e_zone') return updateFadeHauntPosition(obj, pos, dragOffset);
+                if (obj.tool === 'gekko_q_wingman') {return updateGekkoQPosition(obj, pos, specialDragMode as 'center'|'rotate', dragOffset);}
+                if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) {return updateIsoPosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') {return updateKayoPosition(obj, pos, dragOffset);}
+                if (obj.tool.startsWith('killjoy_')) {return updateKilljoyPosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (obj.tool === 'neon_c_wall' || obj.tool === 'neon_q_zone') {return updateNeonPosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (obj.tool === 'omen_q_zone') {return updateOmenPosition(obj, pos, specialDragMode as any, dragOffset);}
+                if (obj.tool === 'raze_c_boombot') {return updateRazePosition(obj, pos, specialDragMode as any, dragOffset);}
+
                 return obj;
             }));
             return;
@@ -347,7 +415,7 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             if (obj.tool === 'image' && obj.x != null && obj.y != null) { const w = obj.width || 50; const h = obj.height || 50; return !(x >= obj.x - w/2 && x <= obj.x + w/2 && y >= obj.y - h/2 && y <= obj.y + h/2); }
 
             // Gomme Multi-points (Wall, Stun, Ult Breach, Aftershock, Trapwire Cypher)
-            if (obj.tool === 'wall' || obj.tool === 'stun_zone' || obj.tool === 'fade_x_zone' ||obj.tool === 'breach_x_zone' || obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor') {
+            if (obj.tool === 'wall' || obj.tool === 'stun_zone'|| obj.tool ===  'neon_c_wall' || obj.tool === 'omen_q_zone'|| obj.tool === 'fade_x_zone' ||obj.tool === 'breach_x_zone' ||obj.tool === 'gekko_q_wingman' ||obj.tool ==='raze_c_boombot'|| obj.tool === 'breach_c_zone' || obj.tool === 'cypher_c_wire'|| obj.tool === 'deadlock_c_wall'|| obj.tool === 'deadlock_q_sensor'|| obj.tool ===  'iso_c_wall'|| obj.tool ===  'iso_q_zone'|| obj.tool ===  'iso_x_zone') {
                 const p1 = obj.points[0]; const p2 = obj.points[1];
                 if (obj.tool === 'deadlock_c_wall') {
                     return Math.hypot(x - p1.x, y - p1.y) > 30;
@@ -357,11 +425,10 @@ export const EditorCanvas = ({ mapSrc }: EditorCanvasProps) => {
             }
 
             // Gomme Circulaire (Brimstone, Chamber, Fade, etc.)
-            if (['brimstone_c_zone','fade_q_zone','fade_e_zone', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone'].includes(obj.tool as string)) {
+            if (['brimstone_c_zone','fade_q_zone','neon_q_zone','fade_e_zone','killjoy_q_zone', 'killjoy_x_zone', 'killjoy_e_turret', 'brimstone_x_zone', 'chamber_c_zone', 'chamber_e_zone', 'cypher_q_zone', 'kayo_e_zone', 'kayo_x_zone'].includes(obj.tool as string)) {
                 const center = obj.points[0];
                 return Math.hypot(x - center.x, y - center.y) > 25;
             }
-
 
             // Gomme Traits Standards
             if (obj.tool === 'rect' && obj.points.length >= 2) {

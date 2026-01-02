@@ -1,4 +1,4 @@
-import type { DrawingObject } from '../types/canvas';
+import type { DrawingObject, StrokeType } from '../types/canvas';
 import { ABILITY_SIZES } from './abilitySizes';
 
 export const createDrawingFromDrop = (
@@ -125,10 +125,136 @@ export const createDrawingFromDrop = (
             imageSrc: 'fade_e_icon'
         };
     }
+    if (name === 'gekko_q') {
+        const handleDist = ABILITY_SIZES['gekko_q_handle_dist'] || 60;
+        return {
+            id,
+            tool: 'gekko_q_wingman', // Nouveau tool
+            subtype: 'ability',
+            // P1 au centre, P2 vers le haut par défaut (car l'image regarde vers le haut)
+            points: [{ x, y }, { x, y: y - handleDist }],
+            imageSrc: 'gekko_q_game', // Nom de ton image
+            color: '#fda4af',
+            thickness: 0,
+            opacity: 1
+        };
+    }
+    if (['iso_c', 'iso_q', 'iso_x'].includes(name)) {
+        let length = 400;
+
+
+        let toolName: StrokeType = 'iso_c_wall';
+
+        let color = '#8b5cf6';
+
+        if (name === 'iso_c') {
+            length = ABILITY_SIZES['iso_c_length'] || 400;
+            toolName = 'iso_c_wall';
+        }
+        if (name === 'iso_q') {
+            length = ABILITY_SIZES['iso_q_length'] || 500;
+            toolName = 'iso_q_zone'; // TypeScript acceptera car c'est une valeur valide de StrokeType
+            color = '#6d28d9';
+        }
+        if (name === 'iso_x') {
+            length = ABILITY_SIZES['iso_x_length'] || 800;
+            toolName = 'iso_x_zone';
+            color = '#3b82f6';
+        }
+
+        return {
+            id,
+            tool: toolName,
+            subtype: 'ability',
+            points: [{ x, y }, { x: x + length, y }], // P1 et P2 (horizontal)
+            color: color,
+            thickness: 0,
+            opacity: 0.6
+        };
+    }
+    if (name === 'kayo_e' || name === 'kayo_x') {
+        const isUlt = name === 'kayo_x';
+        const toolName: StrokeType = isUlt ? 'kayo_x_zone' : 'kayo_e_zone';
+        const color = isUlt ? '#06b6d4' : '#22d3ee'; // Cyan
+
+        return {
+            id,
+            tool: toolName,
+            subtype: 'ability',
+            points: [{ x, y }], // Un seul point central
+            color: color,
+            thickness: 0,
+            opacity: 0.7,
+            imageSrc: `${name}_icon` // ex: kayo_e_icon
+        };
+    }
+    if (name.startsWith('killjoy_')) {
+        // E - Tourelle (Orientable)
+        if (name === 'killjoy_e') {
+            const dist = ABILITY_SIZES['killjoy_e_handle_dist'] || 60;
+            const toolName: StrokeType = 'killjoy_e_turret';
+            return {
+                id,
+                tool: toolName,
+                subtype: 'ability',
+                points: [{ x, y }, { x, y: y - dist }],
+                imageSrc: 'killjoy_e_game', // Assure-toi d'avoir cette image
+                color: '#eab308',
+                thickness: 0,
+                opacity: 1
+            };
+        }
+        // Q & X (Circulaire)
+        let toolName: StrokeType = 'killjoy_q_zone';
+        let color = '#eab308';
+        if (name === 'killjoy_x') {
+            toolName = 'killjoy_x_zone';
+            color = '#06b6d4';
+        }
+        return {id, tool: toolName, subtype: 'ability', points: [{ x, y }], imageSrc: `${name}_icon`, color: color, thickness: 0, opacity: 0.6};
+    }
+    if (name.startsWith('neon_')) {
+        if (name === 'neon_c') {
+            const length = ABILITY_SIZES['neon_c_length'] || 600;
+            const toolName: StrokeType = 'neon_c_wall';
+            return {id, tool: toolName, subtype: 'ability', points: [{ x, y }, { x: x + length, y }], color: '#22d3ee', thickness: 0, opacity: 0.7
+            };
+        }
+        if (name === 'neon_q') {const toolName: StrokeType = 'neon_q_zone';return {id, tool: toolName, subtype: 'ability', points: [{ x, y }], imageSrc: 'neon_q_icon', color: '#22d3ee', thickness: 0, opacity: 0.6};}}
+    if (name.startsWith('omen_')) {
+        // Q - Paranoïa
+        if (name === 'omen_q') {
+            const length = ABILITY_SIZES['omen_q_length'] || 600;
+            const toolName: StrokeType = 'omen_q_zone';
+            return {
+                id,
+                tool: toolName,
+                subtype: 'ability',
+                points: [{x, y}, {x: x + length, y}], // P1 et P2
+                color: '#8b5cf6',
+                thickness: 0,
+                opacity: 0.7
+            };
+        }
+    }
+    if (name === 'raze_c') {const dist = ABILITY_SIZES['raze_c_handle_dist'] || 60;const toolName: StrokeType = 'raze_c_boombot';
+        return {
+            id,
+            tool: toolName,
+            subtype: 'ability',
+            points: [{ x, y }, { x, y: y - dist }], // P1 et P2
+            imageSrc: 'raze_c_game',
+            color: '#f97316',
+            thickness: 0,
+            opacity: 1
+        };
+    }
     // --- 5. IMAGES GÉNÉRIQUES (Agents, Smokes, Mollys, Icons) ---
 
     // Liste des sorts qui utilisent l'image "_icon"
-    const useIconFile = ['breach_q', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x', 'fade_c','gekko_e','gekko_x'];
+    const useIconFile = ['breach_q',
+        'neon_e', 'neon_x','kayo_q','jett_q','jett_e','jett_x', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x','cypher_e', 'cypher_x', 'deadlock_x', 'fade_c','gekko_e','gekko_x', 'iso_e',
+        'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x'];
 
     const suffix = useIconFile.includes(name) ? '_icon' : '_game';
     const finalImageSrc = type === 'ability' ? `${name}${suffix}` : name;

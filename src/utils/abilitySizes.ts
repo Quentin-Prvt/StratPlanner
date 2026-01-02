@@ -55,5 +55,70 @@ export const ABILITY_SIZES: Record<string, number> = {
     'gekko_c': 130, // Molly
     'gekko_e': 30, // Verti
     'gekko_x': 30, // mordicus
+    'gekko_q_size': 60, // Taille de l'image carrée
+    'gekko_q_handle_dist': 60,
 
+    // HARBOR
+    'harbor_c': 160,
+    'harbor_e': 130, // Smoke
+
+    // ISO
+    'iso_c_width': 120,      // Largeur du mur
+    'iso_c_length': 400,     // Distance parcourue
+    'iso_q_width': 80,       // Largeur du trait
+    'iso_q_length': 500,     // Portée
+    'iso_e': 30,             // Taille de l'icône
+    'iso_x_width': 300,      // Largeur de l'arène
+    'iso_x_length': 800,     // Longueur de l'arène
+
+    // JETT
+    'jett_c': 100,
+    'jett_q': 30,
+    'jett_e': 30,
+    'jett_x': 30,
+
+    // KAYO
+    'kayo_c': 120,
+    'kayo_q': 30,
+    'kayo_e_radius': 200,      // Rayon du Couteau (ZERO/POINT)
+    'kayo_e_icon_size': 30,
+    'kayo_x_radius': 480,      // Rayon de l'Ult (NULL/CMD) - Très large
+    'kayo_x_icon_size': 30,
+
+    // KILLJOY
+    'killjoy_c': 110,
+    'killjoy_q_radius': 70,    // Zone de détection
+    'killjoy_q_icon_size': 30,
+    'killjoy_e_size': 30,       // Taille de l'image de la tourelle
+    'killjoy_e_handle_dist': 50,// Distance du losange de rotation
+    'killjoy_x_radius': 370,
+    'killjoy_x_icon_size': 30,
+
+    // NEON
+    'neon_c_width': 40,     // Largeur du couloir (espace entre les murs)
+    'neon_c_length': 290,    // Longueur du mur
+    'neon_q_radius': 70,    // Rayon de la zone
+    'neon_q_icon_size': 30,
+    'neon_e': 50,
+    'neon_x': 60,
+
+    // OMEN
+    'omen_e': 160,
+    'omen_q_width': 105,     // Largeur
+    'omen_q_length': 325,    // Portée
+    'omen_c': 30,
+    'omen_x': 30,
+
+    // PHOENIX
+    'phoenix_c': 30,
+    'phoenix_q': 110,
+    'phoenix_e': 30,
+    'phoenix_x': 30,
+
+    // RAZE
+    'raze_q':30,
+    'raze_e':30,
+    'raze_x':30,
+    'raze_c_size': 100,
+    'raze_c_handle_dist': 30,
 };

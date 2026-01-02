@@ -79,8 +79,9 @@ export const checkBrimstoneStimHit = (
     obj: DrawingObject
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['brimstone_c_radius'] || 250;
-    if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
+    const HITBOX_RADIUS = 25; // Zone cliquable autour du centre
+
+    if (Math.hypot(pos.x - center.x, pos.y - center.y) < HITBOX_RADIUS) {
         return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }
     return null;

@@ -17,6 +17,13 @@ import { drawDeadlockSensor } from './abilities/deadlockSensor';
 import { drawFadeUlt } from './abilities/fadeUlt.ts';
 import { drawFadeSeize } from './abilities/fadeSeize';
 import { drawFadeHaunt } from "./abilities/fadeHaunt.ts";
+import { drawGekkoQ } from './abilities/gekkoQ';
+import { drawIsoRect } from './abilities/isoAbilities';
+import { drawKayoZone } from './abilities/kayoAbilities';
+import { drawKilljoyZone, drawKilljoyTurret } from './abilities/killjoyAbilities';
+import { drawNeonWall, drawNeonStun } from './abilities/neonAbilities';
+import { drawOmenParanoia } from './abilities/omenAbilities';
+import { drawRazeBoomBot } from './abilities/razeAbilities';
 
 /**
  * Fonction principale qui dessine tout sur le canvas
@@ -61,7 +68,19 @@ export const renderDrawings = (
         if (obj.tool === 'fade_x_zone') { drawFadeUlt(ctx, obj);return; }
         if (obj.tool === 'fade_e_zone') {drawFadeHaunt(ctx, obj, imageCache, triggerRedraw);return;}
         if (obj.tool === 'fade_q_zone') { drawFadeSeize(ctx, obj, imageCache, triggerRedraw);return; }
-
+        // Gekko
+        if (obj.tool === 'gekko_q_wingman') {drawGekkoQ(ctx, obj, imageCache, triggerRedraw);return;}
+        // Iso
+        if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) {drawIsoRect(ctx, obj);return;}
+        // Kayo
+        if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') {drawKayoZone(ctx, obj, imageCache, triggerRedraw);return;}
+        // Killjoy
+        if (obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') {drawKilljoyZone(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'killjoy_e_turret') {drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'neon_c_wall') {drawNeonWall(ctx, obj);return;}
+        if (obj.tool === 'neon_q_zone') {drawNeonStun(ctx, obj, imageCache, triggerRedraw);return;}
+        if (obj.tool === 'omen_q_zone') {drawOmenParanoia(ctx, obj);return;}
+        if (obj.tool === 'raze_c_boombot') {drawRazeBoomBot(ctx, obj, imageCache, triggerRedraw);return;}
         // --- B. IMAGES CLASSIQUES & ICONES ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             // Détection du type pour le dossier
@@ -71,7 +90,10 @@ export const renderDrawings = (
             const isIconStyle = [
                 'breach_q',
                 'chamber_q', 'chamber_x',
-                'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c', 'gekko_e','gekko_x'
+                'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c', 'gekko_e','gekko_x',
+                'iso_e','jett_q','jett_e','jett_x','kayo_q',
+                'neon_e', 'neon_x',
+                'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x'
             ].some(key => obj.imageSrc?.includes(key));
 
             // Gestion du chargement d'image
