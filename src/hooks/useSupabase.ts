@@ -14,6 +14,9 @@ export const useSupabaseStrategies = () => {
     const [folders, setFolders] = useState<Folder[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
+    // RESTORED: These were missing and causing the error in EditorCanvas
+    const [showLoadModal, setShowLoadModal] = useState(false);
+
     // --- STRATEGIES ---
 
     const fetchStrategies = useCallback(async () => {
@@ -48,7 +51,7 @@ export const useSupabaseStrategies = () => {
                 map_name: mapName,
                 title: title,
                 data: [],
-                folder_id: null // Par défaut à la racine
+                folder_id: null
             }])
             .select()
             .single();
@@ -85,7 +88,7 @@ export const useSupabaseStrategies = () => {
             .update({ folder_id: folderId })
             .eq('id', strategyId);
 
-        if (!error) fetchStrategies(); // Rafraîchir
+        if (!error) fetchStrategies();
     };
 
     // --- FOLDERS ---
@@ -113,9 +116,6 @@ export const useSupabaseStrategies = () => {
     };
 
     const deleteFolder = async (id: number) => {
-        // 1. D'abord on sort les stratégies du dossier (optionnel, sinon elles sont supprimées si cascade, ou set null)
-        // Ici on a mis "ON DELETE SET NULL" dans SQL donc les strats reviennent à la racine automatiquement.
-
         const { error } = await supabase
             .from('folders')
             .delete()
@@ -123,7 +123,7 @@ export const useSupabaseStrategies = () => {
 
         if (!error) {
             setFolders(prev => prev.filter(f => f.id !== id));
-            fetchStrategies(); // Pour mettre à jour les folder_id des strats
+            fetchStrategies();
         }
     };
 
@@ -131,6 +131,10 @@ export const useSupabaseStrategies = () => {
         savedStrategies,
         folders,
         isLoading,
+        // RESTORED: Returned here so EditorCanvas can access them
+        showLoadModal,
+        setShowLoadModal,
+
         fetchStrategies,
         fetchFolders,
         getStrategyById,

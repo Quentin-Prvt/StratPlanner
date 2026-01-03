@@ -7,6 +7,7 @@ import { MapSelector } from './pages/MapSelector';   // Ancien Home.tsx (Choix d
 import { StrategyEditorPage } from './pages/StrategyEditorPage'; // Page qui contient EditorCanvas
 import { Login } from './pages/Login';               // Page de connexion
 import { Register } from './pages/Register';         // Page d'inscription
+import {Header } from './components/Header';
 
 // Gardien : Empêche l'accès aux pages protégées si non connecté
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -37,8 +38,7 @@ function App() {
         <AuthProvider>
             {/* Conteneur principal plein écran */}
             <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#1f2326]">
-
-                {/* Plus de <Header /> global ici, car géré par le Dashboard ou inutile dans l'éditeur */}
+                <Header />
 
                 <main className="flex-1 relative overflow-hidden">
                     <Routes>
