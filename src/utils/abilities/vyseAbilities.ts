@@ -4,13 +4,13 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * DESSIN : Q - Mur Orientable (Style Métallique/Violet)
  */
-export const drawVyseWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawVyseWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Centre
     const p2 = obj.points[1]; // Direction (Poignée)
 
-    const width = ABILITY_SIZES['vyse_q_width'] || 20;
-    const length = ABILITY_SIZES['vyse_q_length'] || 450;
+    const width = ABILITY_SIZES['vyse_q_width'] * mapScale;
+    const length = ABILITY_SIZES['vyse_q_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     // Couleurs Thème Vyse (Métal sombre / Violet)
@@ -63,13 +63,14 @@ export const drawVyseUltZone = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
-    const radius = ABILITY_SIZES['vyse_x_radius'] || 400;
-    const iconSize = ABILITY_SIZES['vyse_x_icon_size'] || 60;
+    const radius = ABILITY_SIZES['vyse_x_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['vyse_x_icon_size'] * mapScale;
 
     const mainColor = 'rgba(168, 85, 247, 0.2)'; // Violet transparent
     const strokeColor = '#a855f7'; // Violet Purple-500
@@ -140,7 +141,8 @@ export const updateVysePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
 
@@ -153,7 +155,7 @@ export const updateVysePosition = (
     if (obj.tool === 'vyse_q_wall') {
         // Pour la rotation, on garde la distance P1-P2 constante
         // On utilise la moitié de la longueur comme distance de référence pour le handle
-        const length = ABILITY_SIZES['vyse_q_length'] || 450;
+        const length = ABILITY_SIZES['vyse_q_length'] * mapScale;
         const handleDist = length / 2;
 
         if (mode === 'rotate') {

@@ -4,13 +4,13 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * DESSIN : Q - Paranoïa
  */
-export const drawOmenParanoia = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawOmenParanoia = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction
 
-    const width = ABILITY_SIZES['omen_q_width'] || 105;
-    const length = ABILITY_SIZES['omen_q_length'] || 325;
+    const width = ABILITY_SIZES['omen_q_width'] * mapScale;
+    const length = ABILITY_SIZES['omen_q_length'] * mapScale;
 
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
@@ -77,9 +77,10 @@ export const updateOmenPosition = (
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
     dragOffset: { x: number, y: number }
+    ,mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
-    const length = ABILITY_SIZES['omen_q_length'] || 600;
+    const length = ABILITY_SIZES['omen_q_length'] * mapScale;
 
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

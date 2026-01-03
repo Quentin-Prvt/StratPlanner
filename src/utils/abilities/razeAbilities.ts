@@ -8,13 +8,14 @@ export const drawRazeBoomBot = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Centre
     const p2 = obj.points[1]; // Direction
 
-    const size = ABILITY_SIZES['raze_c_size'] || 50;
+    const size = ABILITY_SIZES['raze_c_size'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     ctx.save();
@@ -67,10 +68,10 @@ export const drawRazeBoomBot = (
 /**
  * HIT TEST
  */
-export const checkRazeHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
+export const checkRazeHit = (pos: { x: number, y: number }, obj: DrawingObject, mapScale: number = 1.0) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-    const size = ABILITY_SIZES['raze_c_size'] || 50;
+    const size = ABILITY_SIZES['raze_c_size'] * mapScale;
 
     // Clic Rotation (Losange)
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'rotate' };
@@ -89,10 +90,11 @@ export const updateRazePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
-    const dist = ABILITY_SIZES['raze_c_handle_dist'] || 30;
+    const dist = ABILITY_SIZES['raze_c_handle_dist'] * mapScale;
 
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

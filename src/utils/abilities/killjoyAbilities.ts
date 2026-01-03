@@ -9,14 +9,15 @@ export const drawKilljoyZone = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
     const isUlt = obj.tool === 'killjoy_x_zone';
 
-    const radius = ABILITY_SIZES[isUlt ? 'killjoy_x_radius' : 'killjoy_q_radius'] || (isUlt ? 900 : 120);
-    const iconSize = ABILITY_SIZES[isUlt ? 'killjoy_x_icon_size' : 'killjoy_q_icon_size'] || 40;
+    const radius = ABILITY_SIZES[isUlt ? 'killjoy_x_radius' : 'killjoy_q_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES[isUlt ? 'killjoy_x_icon_size' : 'killjoy_q_icon_size'] * mapScale;
 
     // Couleurs : Jaune pour le bot, Cyan Tech pour l'ult
     const color = isUlt ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.2)';
@@ -57,12 +58,13 @@ export const drawKilljoyTurret = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-    const size = ABILITY_SIZES['killjoy_e_size'] || 60;
+    const size = ABILITY_SIZES['killjoy_e_size'] * mapScale;
 
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
@@ -103,12 +105,12 @@ export const drawKilljoyTurret = (
 /**
  * HIT TEST (Combiné)
  */
-export const checkKilljoyHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
+export const checkKilljoyHit = (pos: { x: number, y: number }, obj: DrawingObject, mapScale: number = 1.0) => {
     // Cas Tourelle (Orientable)
     if (obj.tool === 'killjoy_e_turret') {
         const p1 = obj.points[0];
         const p2 = obj.points[1];
-        const size = ABILITY_SIZES['killjoy_e_size'] || 60;
+        const size = ABILITY_SIZES['killjoy_e_size'] * mapScale;
 
         if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 15) return { mode: 'rotate' };
         if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < size/2) return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
@@ -131,7 +133,7 @@ export const updateKilljoyPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ) => {
     // Tourelle Rotation
     if (obj.tool === 'killjoy_e_turret' && mode === 'rotate') {

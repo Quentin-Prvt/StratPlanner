@@ -9,11 +9,12 @@ export const drawBrimstoneStim = (
     // On met un type explicite et une valeur par défaut pour éviter le crash si oublié
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['brimstone_c_radius'] || 250;
+    const radius = ABILITY_SIZES['brimstone_c_radius'] * mapScale;
 
     ctx.save();
 
@@ -50,7 +51,6 @@ export const drawBrimstoneStim = (
             imageCache.set(imageSrc, img);
         }
 
-        // CORRECTION CRITIQUE : On vérifie naturalWidth > 0
         // Cela garantit que l'image est bien chargée et valide avant le drawImage
         if (img.complete && img.naturalWidth > 0) {
             try {
@@ -92,7 +92,7 @@ export const checkBrimstoneStimHit = (
 export const updateBrimstoneStimPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     const newCenter = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
     return { ...obj, points: [newCenter] };

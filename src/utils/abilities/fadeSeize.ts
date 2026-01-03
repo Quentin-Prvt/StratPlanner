@@ -6,14 +6,15 @@ export const drawFadeSeize = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
     // --- UTILISATION DES TAILLES DYNAMIQUES ---
-    const radius = ABILITY_SIZES['fade_q_radius'] || 160;
-    const iconSize = ABILITY_SIZES['fade_q_icon_size'] || 45;
+    const radius = ABILITY_SIZES['fade_q_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['fade_q_icon_size'] * mapScale;
 
     ctx.save();
 
@@ -83,7 +84,7 @@ export const checkFadeSeizeHit = (
 export const updateFadeSeizePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     return { ...obj, points: [{ x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }] };
 };

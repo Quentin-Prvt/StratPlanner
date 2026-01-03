@@ -4,12 +4,12 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * Dessine l'Ultime de Brimstone (Orbital Strike - X)
  */
-export const drawBrimstoneUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawBrimstoneUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
     // Récupération du rayon configuré
-    const radius = ABILITY_SIZES['brimstone_x_radius'] || 320;
+    const radius = ABILITY_SIZES['brimstone_x_radius'] * mapScale;
 
     ctx.save();
 
@@ -52,10 +52,11 @@ export const drawBrimstoneUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObje
  */
 export const checkBrimstoneUltHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
+    obj: DrawingObject,
+    mapScale: number = 1.0
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['brimstone_x_radius'] || 320;
+    const radius = ABILITY_SIZES['brimstone_x_radius'] * mapScale;
 
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
         return {
@@ -73,7 +74,7 @@ export const checkBrimstoneUltHit = (
 export const updateBrimstoneUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     const newCenter = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
     return { ...obj, points: [newCenter] };

@@ -4,15 +4,15 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * 1. DESSIN : Capteur + Zone rectangulaire orientée
  */
-export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const center = obj.points[0];
     const handle = obj.points[1];
 
     // Récupération des config
-    const length = ABILITY_SIZES['deadlock_q_length'] || 200;
-    const width = ABILITY_SIZES['deadlock_q_width'] || 120;
-    const iconSize = ABILITY_SIZES['deadlock_q_icon_size'] || 20;
+    const length = ABILITY_SIZES['deadlock_q_length'] * mapScale;
+    const width = ABILITY_SIZES['deadlock_q_width'] * mapScale;
+    const iconSize = ABILITY_SIZES['deadlock_q_icon_size'] * mapScale;
 
     // Calcul de l'angle de rotation
     const dx = handle.x - center.x;
@@ -96,11 +96,12 @@ export const updateDeadlockSensorPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ): DrawingObject => {
     const center = obj.points[0];
     const handle = obj.points[1];
-    const length = ABILITY_SIZES['deadlock_q_length'] || 200;
+    const length = ABILITY_SIZES['deadlock_q_length'] * mapScale;
 
     if (mode === 'center') {
         // Déplacement global

@@ -8,13 +8,14 @@ export const drawGekkoQ = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Centre de l'image
     const p2 = obj.points[1]; // Poignée de rotation
 
-    const size = ABILITY_SIZES['gekko_q_size'] || 60;
+    const size = ABILITY_SIZES['gekko_q_size'] * mapScale;
 
     // Calcul de l'angle
     const dx = p2.x - p1.x;
@@ -75,11 +76,12 @@ export const drawGekkoQ = (
  */
 export const checkGekkoQHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
+    obj: DrawingObject,
+    mapScale: number = 1.0
 ): { mode: 'center' | 'rotate', offset?: { x: number, y: number } } | null => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-    const size = ABILITY_SIZES['gekko_q_size'] || 60;
+    const size = ABILITY_SIZES['gekko_q_size'] * mapScale;
 
     // 1. Clic sur le Losange (Rotate)
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 15) {
@@ -101,10 +103,11 @@ export const updateGekkoQPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ): DrawingObject => {
     const p1 = obj.points[0];
-    const handleDist = ABILITY_SIZES['gekko_q_handle_dist'] || 60;
+    const handleDist = ABILITY_SIZES['gekko_q_handle_dist'] * mapScale;
 
     if (mode === 'rotate') {
         // On calcule le nouvel angle vers la souris

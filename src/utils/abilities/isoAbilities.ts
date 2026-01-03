@@ -4,26 +4,26 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * Récupère la config (taille/couleur) selon le sort
  */
-const getIsoConfig = (tool: string) => {
+const getIsoConfig = (tool: string, mapScale: number = 1.0) => {
     switch (tool) {
         case 'iso_c_wall':
             return {
-                width: ABILITY_SIZES['iso_c_width'] || 120,
-                length: ABILITY_SIZES['iso_c_length'] || 400,
+                width: ABILITY_SIZES['iso_c_width'] * mapScale,
+                length: ABILITY_SIZES['iso_c_length'] * mapScale,
                 color: 'rgba(139, 92, 246, 0.4)',
                 stroke: '#8b5cf6'
             };
         case 'iso_q_zone':
             return {
-                width: ABILITY_SIZES['iso_q_width'] || 80,
-                length: ABILITY_SIZES['iso_q_length'] || 500,
+                width: ABILITY_SIZES['iso_q_width'] * mapScale,
+                length: ABILITY_SIZES['iso_q_length'] * mapScale,
                 color: 'rgba(139, 92, 246, 0.4)',
                 stroke: '#8b5cf6'
             };
         case 'iso_x_zone':
             return {
-                width: ABILITY_SIZES['iso_x_width'] || 300,
-                length: ABILITY_SIZES['iso_x_length'] || 800,
+                width: ABILITY_SIZES['iso_x_width'] * mapScale,
+                length: ABILITY_SIZES['iso_x_length'] * mapScale,
                 color: 'rgba(139, 92, 246, 0.4)',
                 stroke: '#8b5cf6'
             };

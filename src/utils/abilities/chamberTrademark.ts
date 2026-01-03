@@ -9,14 +9,15 @@ export const drawChamberTrademark = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
     // Récupération des tailles configurées
-    const radius = ABILITY_SIZES['chamber_c_radius'] || 220;
-    const iconSize = ABILITY_SIZES['chamber_c_icon_size'] || 50;
+    const radius = ABILITY_SIZES['chamber_c_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['chamber_c_icon_size'] * mapScale;
 
     ctx.save();
 
@@ -71,10 +72,11 @@ export const drawChamberTrademark = (
  */
 export const checkChamberTrademarkHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
+    obj: DrawingObject,
+    mapScale: number = 1.0
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['chamber_c_radius'] || 220;
+    const radius = ABILITY_SIZES['chamber_c_radius'] * mapScale;
 
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
         return {
@@ -91,7 +93,7 @@ export const checkChamberTrademarkHit = (
 export const updateChamberTrademarkPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     const newCenter = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
     return { ...obj, points: [newCenter] };

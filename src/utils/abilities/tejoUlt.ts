@@ -4,13 +4,17 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * DESSIN : Tejo X (Rectangle Directionnel)
  */
-export const drawTejoUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawTejoUlt = (
+    ctx: CanvasRenderingContext2D,
+    obj: DrawingObject,
+    mapScale: number = 1.0
+) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction
 
-    const width = ABILITY_SIZES['tejo_x_width'] || 240;
-    const length = ABILITY_SIZES['tejo_x_length'] || 650;
+    const width = ABILITY_SIZES['tejo_x_width'] * mapScale;
+    const length = ABILITY_SIZES['tejo_x_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     ctx.save();
@@ -31,7 +35,6 @@ export const drawTejoUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) =
     ctx.strokeStyle = accentColor;
     ctx.lineWidth = 3;
     ctx.strokeRect(0, -width / 2, length, width);
-
 
     ctx.restore();
 
@@ -55,7 +58,10 @@ export const drawTejoUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) =
 /**
  * HIT TEST
  */
-export const checkTejoUltHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
+export const checkTejoUltHit = (
+    pos: { x: number, y: number },
+    obj: DrawingObject,
+) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
 
@@ -76,10 +82,11 @@ export const updateTejoUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
-    const length = ABILITY_SIZES['tejo_x_length'] || 650;
+    const length = ABILITY_SIZES['tejo_x_length'] * mapScale;
 
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

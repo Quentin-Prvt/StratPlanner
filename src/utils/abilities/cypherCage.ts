@@ -4,10 +4,14 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * 1. DESSIN : La Cyber Cage
  */
-export const drawCypherCage = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawCypherCage = (
+    ctx: CanvasRenderingContext2D,
+    obj: DrawingObject,
+    mapScale: number = 1.0
+) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['cypher_q_radius'] || 140;
+    const radius = ABILITY_SIZES['cypher_q_radius'] * mapScale;
 
     ctx.save();
 
@@ -55,10 +59,11 @@ export const drawCypherCage = (ctx: CanvasRenderingContext2D, obj: DrawingObject
  */
 export const checkCypherCageHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
+    obj: DrawingObject,
+    mapScale: number = 1.0
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['cypher_q_radius'] || 140;
+    const radius = ABILITY_SIZES['cypher_q_radius'] * mapScale;
 
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
         return {
@@ -75,7 +80,7 @@ export const checkCypherCageHit = (
 export const updateCypherCagePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     const newCenter = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
     return { ...obj, points: [newCenter] };

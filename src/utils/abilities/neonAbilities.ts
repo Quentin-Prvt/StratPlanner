@@ -4,13 +4,13 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * DESSIN : C - Fast Lane (Double Mur)
  */
-export const drawNeonWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawNeonWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction
 
-    const width = ABILITY_SIZES['neon_c_width'] || 40;   // Espace entre les murs
-    const length = ABILITY_SIZES['neon_c_length'] || 290; // Longueur
+    const width = ABILITY_SIZES['neon_c_width'] * mapScale;   // Espace entre les murs
+    const length = ABILITY_SIZES['neon_c_length'] * mapScale; // Longueur
     const wallThickness = 10; // Épaisseur visuelle des murs bleus
 
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
@@ -61,12 +61,13 @@ export const drawNeonStun = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
-    triggerRedraw: () => void
+    triggerRedraw: () => void,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['neon_q_radius'] || 140;
-    const iconSize = ABILITY_SIZES['neon_q_icon_size'] || 45;
+    const radius = ABILITY_SIZES['neon_q_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['neon_q_icon_size'] * mapScale;
 
     ctx.save();
 
@@ -129,7 +130,8 @@ export const updateNeonPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
 
@@ -139,7 +141,7 @@ export const updateNeonPosition = (
     }
 
     // C (Wall)
-    const length = ABILITY_SIZES['neon_c_length'] || 600;
+    const length = ABILITY_SIZES['neon_c_length'] * mapScale;
 
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

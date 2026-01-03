@@ -9,13 +9,14 @@ export const drawSovaBolt = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
-    const radius = ABILITY_SIZES['sova_e_radius'] || 250;
-    const iconSize = ABILITY_SIZES['sova_e_icon_size'] || 50;
+    const radius = ABILITY_SIZES['sova_e_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['sova_e_icon_size'] * mapScale;
 
     ctx.save();
 
@@ -48,13 +49,13 @@ export const drawSovaBolt = (
 /**
  * DESSIN : X - Hunter's Fury (Rectangle Directionnel)
  */
-export const drawSovaUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawSovaUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction
 
-    const width = ABILITY_SIZES['sova_x_width'] || 80;
-    const length = ABILITY_SIZES['sova_x_length'] || 900;
+    const width = ABILITY_SIZES['sova_x_width'] * mapScale;
+    const length = ABILITY_SIZES['sova_x_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     ctx.save();
@@ -128,7 +129,8 @@ export const updateSovaPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
 
@@ -138,7 +140,7 @@ export const updateSovaPosition = (
     }
 
     // X (Ult)
-    const length = ABILITY_SIZES['sova_x_length'] || 900;
+    const length = ABILITY_SIZES['sova_x_length'] * mapScale;
 
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

@@ -38,7 +38,7 @@ export const createDrawingFromDrop = (
         id,
         tool: 'breach_x_zone',
         subtype: 'ability',
-        points: [{x, y}, {x, y: y - 850}],
+        points: [{x, y}, {x, y: y - 400}],
         color: '#ef4444',
         thickness: 0,
         opacity: 0.8

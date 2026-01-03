@@ -8,7 +8,7 @@ const HANDLE_DISTANCE = 100;
 /**
  * Dessine le C de Breach (Aftershock)
  */
-export const drawBreachAftershock = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawBreachAftershock = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction
@@ -19,9 +19,9 @@ export const drawBreachAftershock = (ctx: CanvasRenderingContext2D, obj: Drawing
     const angle = Math.atan2(dy, dx);
 
     // --- MODIFICATION ICI : Récupération des deux tailles ---
-    const blastWidth = ABILITY_SIZES['breach_c'] || 60;
+    const blastWidth = ABILITY_SIZES['breach_c'] * mapScale;
     // On utilise la longueur configurée, sinon on garde un ratio par défaut
-    const blastLength = ABILITY_SIZES['breach_c_length'] || 180;
+    const blastLength = ABILITY_SIZES['breach_c_length'] * mapScale;
 
     ctx.save();
 

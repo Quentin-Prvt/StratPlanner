@@ -9,15 +9,16 @@ export const drawKayoZone = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
     // Config selon l'outil (E ou X)
     const isUlt = obj.tool === 'kayo_x_zone';
-    const radius = ABILITY_SIZES[isUlt ? 'kayo_x_radius' : 'kayo_e_radius'] || (isUlt ? 450 : 200);
-    const iconSize = ABILITY_SIZES[isUlt ? 'kayo_x_icon_size' : 'kayo_e_icon_size'] || 50;
+    const radius = ABILITY_SIZES[isUlt ? 'kayo_x_radius' : 'kayo_e_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES[isUlt ? 'kayo_x_icon_size' : 'kayo_e_icon_size'] * mapScale;
 
     // Couleurs : Cyan électrique pour le E, Bleu plus dense pour l'Ult
     const fillColor = isUlt ? 'rgba(6, 182, 212, 0.15)' : 'rgba(34, 211, 238, 0.2)';
@@ -90,7 +91,7 @@ export const checkKayoHit = (
 export const updateKayoPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     return { ...obj, points: [{ x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }] };
 };

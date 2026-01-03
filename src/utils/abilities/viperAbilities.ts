@@ -4,12 +4,12 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * DESSIN : Viper E - Toxic Screen (Mur d'émetteurs)
  */
-export const drawViperWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawViperWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction
 
-    const length = ABILITY_SIZES['viper_e_length'] || 1200;
+    const length = ABILITY_SIZES['viper_e_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     ctx.save();
@@ -73,10 +73,11 @@ export const updateViperPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'rotate',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
-    const length = ABILITY_SIZES['viper_e_length'] || 1200;
+    const length = ABILITY_SIZES['viper_e_length'] * mapScale;
 
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

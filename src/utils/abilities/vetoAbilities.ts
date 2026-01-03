@@ -25,14 +25,15 @@ export const drawVetoZone = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
     const conf = getVetoConfig(obj.tool);
 
-    const radius = ABILITY_SIZES[conf.radiusKey] || 200;
-    const iconSize = ABILITY_SIZES[conf.iconKey] || 50;
+    const radius = ABILITY_SIZES[conf.radiusKey] * mapScale;
+    const iconSize = ABILITY_SIZES[conf.iconKey] * mapScale;
 
     ctx.save();
 
@@ -81,7 +82,7 @@ export const checkVetoHit = (pos: { x: number, y: number }, obj: DrawingObject) 
 export const updateVetoPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ) => {
     // Simple déplacement du point central
     return { ...obj, points: [{ x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }] };

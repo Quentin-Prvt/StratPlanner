@@ -24,6 +24,8 @@ interface ToolsSidebarProps {
     onLoad: () => void;
     showZones: boolean;
     setShowZones: (b: boolean) => void;
+    iconSize: number;
+    setIconSize: (s: number) => void;
 }
 
 export const ToolsSidebar = ({
@@ -33,7 +35,8 @@ export const ToolsSidebar = ({
                                  opacity, setOpacity,
                                  thickness, setThickness,
                                  selectedAgent, setSelectedAgent,
-                                 showZones, setShowZones
+                                 showZones, setShowZones,
+                                 iconSize, setIconSize
                              }: ToolsSidebarProps) => {
 
     const colors = [
@@ -221,6 +224,7 @@ export const ToolsSidebar = ({
                 <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-left-4 duration-300 bg-slate-800 p-3 rounded-lg border border-slate-700">
                     <span className="text-sm font-medium text-gray-400 border-b border-gray-700 pb-2">Affichage</span>
 
+                    {/* Toggle Zones */}
                     <button
                         onClick={() => setShowZones(!showZones)}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded transition-colors ${
@@ -230,6 +234,23 @@ export const ToolsSidebar = ({
                         <span className="text-xs font-bold uppercase">Zones de portée</span>
                         <div className={`w-3 h-3 rounded-full transition-all ${showZones ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-gray-600'}`} />
                     </button>
+
+                    {/* NOUVEAU : Slider Taille Icônes */}
+                    <div className="flex flex-col gap-2 pt-2 border-t border-gray-700">
+                        <div className="flex justify-between items-center text-gray-400 text-xs uppercase font-bold">
+                            <span>Taille Icônes</span>
+                            <span className="text-white">{iconSize}px</span>
+                        </div>
+                        <input
+                            type="range"
+                            min="10"
+                            max="60"
+                            step="2"
+                            value={iconSize}
+                            onChange={(e) => setIconSize(parseInt(e.target.value))}
+                            className="w-full h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                    </div>
                 </div>
             )}
 

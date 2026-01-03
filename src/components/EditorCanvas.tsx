@@ -12,10 +12,9 @@ import type { DrawingObject, ToolType, StrokeType } from '../types/canvas';
 // NOUVEAUX IMPORTS
 import { useCanvasZoom } from '../hooks/useCanvasZoom';
 import { checkAbilityHit, updateAbilityPosition } from '../utils/canvasHitDetection';
-import { MAPS_REGISTRY } from '../utils/mapsRegistry'; // <--- Import du registre des cartes
+import { MAP_CONFIGS } from '../utils/mapsRegistry';
 
 interface EditorCanvasProps {
-    // mapSrc: string;  <-- SUPPRIMÉ car géré en interne maintenant
     strategyId: string;
 }
 
@@ -42,6 +41,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     const [drawings, setDrawings] = useState<DrawingObject[]>([]);
     const [showZones, setShowZones] = useState(true);
     const [notification, setNotification] = useState<{message: string, type: 'success' | 'info'} | null>(null);
+    const [iconSize, setIconSize] = useState(30);
 
     // Texte
     const [isTextModalOpen, setIsTextModalOpen] = useState(false);
@@ -69,6 +69,12 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         setTimeout(() => setNotification(null), 3000);
     };
 
+    // --- SCALE HELPER ---
+    const getCurrentScale = () => {
+        const entry = Object.entries(MAP_CONFIGS).find(([_, config]) => config.src === currentMapSrc);
+        return entry ? entry[1].scale : 1.0;
+    };
+
     // --- INITIALISATION & CHARGEMENT DE LA MAP ---
     useEffect(() => {
         const loadInitialData = async () => {
@@ -76,17 +82,14 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             const data = await getStrategyById(strategyId);
 
             if (data) {
-                // 1. Charger les dessins
                 if (data.data) {
                     setDrawings(data.data);
                 }
-
-                // 2. Charger la bonne image de MAP
                 if (data.map_name) {
                     const mapKey = data.map_name.toLowerCase();
-                    const src = MAPS_REGISTRY[mapKey];
-                    if (src) {
-                        setCurrentMapSrc(src);
+                    const mapConfig = MAP_CONFIGS[mapKey];
+                    if (mapConfig) {
+                        setCurrentMapSrc(mapConfig.src);
                     } else {
                         console.error(`Map "${mapKey}" introuvable dans le registre.`);
                     }
@@ -130,8 +133,14 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         const canvas = mainCanvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
-        renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId, showZones);
-    }, [drawings, draggingObjectId, showZones]);
+
+        // 1. On récupère le Scale actuel
+        const mapScale = getCurrentScale();
+
+        // 2. On le passe au renderer
+        // @ts-ignore
+        renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize);
+        }, [drawings, draggingObjectId, showZones, currentMapSrc, iconSize]);
 
     useEffect(() => { redrawMainCanvas(); }, [drawings, redrawMainCanvas, draggingObjectId]);
 
@@ -157,7 +166,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         return () => { img.removeEventListener('load', onLoad); resizeObserver.disconnect(); };
     }, [syncCanvasSize]);
 
-
     // --- HELPERS SOURIS ---
     const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
 
@@ -171,7 +179,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
     };
 
-    // --- LOGIQUE TEXTE (Double Clic + Save) ---
     const handleDoubleClick = (e: React.MouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -198,7 +205,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     };
 
     const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
-        // Mode Mise à jour
         if (editingTextId !== null) {
             setDrawings(prev => prev.map(obj => {
                 if (obj.id === editingTextId) {
@@ -212,7 +218,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             return;
         }
 
-        // Mode Création (avec Clamping)
         if (!containerRef.current || !imgRef.current) return;
         const containerRect = containerRef.current.getBoundingClientRect();
         const centerX = containerRect.width / 2;
@@ -222,7 +227,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         let mapX = (centerX - x) / scale;
         let mapY = (centerY - y) / scale;
 
-        // Force dans l'image
         const margin = 20;
         const imgW = imgRef.current.clientWidth;
         const imgH = imgRef.current.clientHeight;
@@ -247,7 +251,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
     // --- EVENT HANDLERS ---
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1) { // Middle Click Pan
+        if (e.button === 1) {
             setIsPanning(true);
             panStartRef.current = { x: e.clientX, y: e.clientY };
             if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -255,13 +259,15 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             return;
         }
 
+        const mapScale = getCurrentScale();
+        const baseSize = 36;
+        const scaledSize = baseSize * mapScale; // TAILLE DES AGENTS
         const pos = getMousePos(e);
 
         if (currentTool === 'cursor') {
             for (let i = drawings.length - 1; i >= 0; i--) {
                 const obj = drawings[i];
 
-                // Hit Test Texte
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
@@ -269,15 +275,15 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                         setDraggingObjectId(obj.id); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
-                // Hit Test Images
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = obj.width || 50; const h = obj.height || 50;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
                         setDraggingObjectId(obj.id); setSpecialDragMode(null); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
-                // Hit Test Abilities
-                const hit = checkAbilityHit(pos, obj);
+
+                // @ts-ignore
+                const hit = checkAbilityHit(pos, obj, mapScale);
                 if (hit) {
                     setDraggingObjectId(hit.id); setSpecialDragMode(hit.mode);
                     if (hit.offset) setDragOffset(hit.offset);
@@ -288,10 +294,13 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             setDraggingObjectId(null);
             return;
         }
-
         if (currentTool === 'agent') {
-            const newAgent: DrawingObject = { id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: 50, height: 50 };
-            setDrawings(prev => [...prev, newAgent]); return;
+            const newAgent: DrawingObject = {
+                id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1,
+                imageSrc: selectedAgent, x: pos.x, y: pos.y, width: scaledSize, height: scaledSize
+            };
+            setDrawings(prev => [...prev, newAgent]);
+            return;
         }
         if (currentTool === 'eraser') { setIsDrawing(true); eraseObjectAt(pos.x, pos.y); return; }
 
@@ -330,7 +339,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             setDrawings(prev => prev.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
 
-                // Drag Image/Text (avec clamping objet)
                 if ((obj.tool === 'image' || obj.tool === 'text') && obj.x !== undefined) {
                     let newX = pos.x - dragOffset.x;
                     let newY = pos.y - dragOffset.y;
@@ -341,7 +349,9 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     return { ...obj, x: newX, y: newY };
                 }
 
-                return updateAbilityPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart);
+                const mapScale = getCurrentScale();
+                // @ts-ignore
+                return updateAbilityPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart, mapScale);
             }));
             return;
         }
@@ -498,7 +508,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
     const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; };
 
-    // Objet Texte en cours d'édition (s'il y en a un)
     const editingObj = editingTextId ? drawings.find(d => d.id === editingTextId) : null;
 
     return (
@@ -518,6 +527,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent}
                     onSave={() => alert("Sauvegarde automatique active !")} onLoad={fetchStrategies}
                     showZones={showZones} setShowZones={setShowZones}
+                    iconSize={iconSize} setIconSize={setIconSize}
                 />
             </div>
 
@@ -528,8 +538,15 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                 <div ref={contentRef} className="origin-top-left absolute top-0 left-0" draggable={false}>
 
                     {currentMapSrc && (
-                        <img ref={imgRef} src={currentMapSrc} alt="Map" draggable={false} className="block select-none pointer-events-none min-w-[1500px] m-4 pr-150 p-6 h-auto  shadow-lg" onLoad={syncCanvasSize} />
-                    )}
+                        <img
+                            ref={imgRef}
+                            src={currentMapSrc}
+                            alt="Map"
+                            draggable={false}
+                            className="block select-none pointer-events-none h-auto shadow-lg p-10"
+                            style={{ width: '100%', minWidth: '1024px' }}
+                            onLoad={syncCanvasSize}
+                        />                    )}
                     <canvas ref={mainCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                     <canvas ref={tempCanvasRef} draggable={false} className="absolute inset-0 w-full h-full pointer-events-none" />
                 </div>

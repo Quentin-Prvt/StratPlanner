@@ -4,14 +4,14 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * Dessine l'Ultime de Fade (Nightfall)
  */
-export const drawFadeUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawFadeUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction (Handle)
 
     // Récupération des tailles depuis la config
-    const width = ABILITY_SIZES['fade_x_width'] || 250;
-    const fixedLength = ABILITY_SIZES['fade_x_length'] || 500;
+    const width = ABILITY_SIZES['fade_x_width'] * mapScale;
+    const fixedLength = ABILITY_SIZES['fade_x_length'] * mapScale;
     const gap = 0; // Espace constant avant le début de la zone
 
     const dx = p2.x - p1.x;
@@ -85,10 +85,11 @@ export const updateFadeUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'handle',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ): DrawingObject => {
     const p1 = obj.points[0];
-    const fixedLength = ABILITY_SIZES['fade_x_length'] || 500;
+    const fixedLength = ABILITY_SIZES['fade_x_length'] * mapScale;
 
     if (mode === 'handle') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);

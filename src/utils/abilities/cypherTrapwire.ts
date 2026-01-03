@@ -15,11 +15,11 @@ const distToSegment = (p: {x: number, y: number}, v: {x: number, y: number}, w: 
 /**
  * 1. DESSIN : Ancre (P1) + Fil + Poignée (P2)
  */
-export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // L'Ancre (Fixe relative)
     const p2 = obj.points[1]; // La Poignée (Mobile)
-    const boxSize = ABILITY_SIZES['cypher_c_box_size'] || 14;
+    const boxSize = ABILITY_SIZES['cypher_c_box_size'] * mapScale;
 
     ctx.save();
 
@@ -94,12 +94,13 @@ export const checkCypherTrapwireHit = (
 export const updateCypherTrapwirePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    mode: 'handle' | 'body', // On a simplifié les modes
-    dragOffset: { x: number, y: number }
+    mode: 'handle' | 'body',
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ): DrawingObject => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-    const maxLength = ABILITY_SIZES['cypher_c_max_length'] || 100;
+    const maxLength = ABILITY_SIZES['cypher_c_max_length'] * mapScale;
 
     if (mode === 'handle') {
         // On déplace P2, mais on le contraint à la longueur max par rapport à P1

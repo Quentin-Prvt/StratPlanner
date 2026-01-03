@@ -4,14 +4,18 @@ import { ABILITY_SIZES } from '../abilitySizes';
 /**
  * 1. DESSIN : Trace les 4 bras indépendants
  */
-export const drawDeadlockWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawDeadlockWall = (
+    ctx: CanvasRenderingContext2D,
+    obj: DrawingObject,
+    mapScale: number = 1.0
+) => {
     // On a besoin de 5 points : Centre + 4 bras
     if (obj.points.length < 5) return;
 
     const center = obj.points[0];
     const arms = [obj.points[1], obj.points[2], obj.points[3], obj.points[4]];
 
-    const nodeSize = ABILITY_SIZES['deadlock_c_node_size'] || 16;
+    const nodeSize = ABILITY_SIZES['deadlock_c_node_size'] * mapScale;
 
     ctx.save();
     ctx.lineCap = 'round';
@@ -56,7 +60,7 @@ export const drawDeadlockWall = (ctx: CanvasRenderingContext2D, obj: DrawingObje
  */
 export const checkDeadlockWallHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
+    obj: DrawingObject,
 ): { mode: number, offset?: { x: number, y: number } } | null => {
 
     const hitRadius = 20;
@@ -81,7 +85,7 @@ export const updateDeadlockWallPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     pointIndex: number, // 0 = centre, 1,2,3,4 = bras
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     const points = [...obj.points];
     const center = points[0];
@@ -97,9 +101,7 @@ export const updateDeadlockWallPosition = (
         return { ...obj, points: newPoints };
     }
 
-    // CAS 2 : Manipulation d'un bras (Rotation liée + Taille indépendante)
-    // Le bras qu'on touche définit la nouvelle rotation.
-    // Les autres suivent la rotation mais gardent leur longueur.
+
 
     const draggedArmIndex = pointIndex;
 
@@ -111,17 +113,6 @@ export const updateDeadlockWallPosition = (
     // On met à jour le point tiré directement à la souris
     points[draggedArmIndex] = { x: pos.x, y: pos.y };
 
-    // 2. Mettre à jour les 3 autres bras
-    // Ils doivent tourner pour respecter l'angle relatif, mais garder leur distance actuelle
-
-    // Définition des angles relatifs fixes pour une croix (0, 90, 180, 270)
-    // On assume que dans le tableau : [Centre, Nord, Est, Sud, Ouest] ou équivalent
-    // Pour simplifier, on dit que :
-    // P1 est à Angle + 0
-    // P2 est à Angle + 90
-    // P3 est à Angle + 180
-    // P4 est à Angle + 270
-    // Il faut trouver le "shift" d'angle basé sur quel bras on tire.
 
     // Index des bras dans le tableau points : 1, 2, 3, 4.
     // On normalise l'index de 0 à 3 pour les calculs d'angle

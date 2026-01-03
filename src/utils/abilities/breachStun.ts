@@ -1,31 +1,25 @@
 import type { DrawingObject } from '../../types/canvas';
+import { ABILITY_SIZES } from '../abilitySizes';
 
-// Constantes de taille (Tes valeurs modifiées)
-const GAP = 105;
-const WIDTH = 90;
-const MAX_LEN = 670;
-
-/**
- * Dessine le Stun de Breach sur le canvas
- */
-export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
-    const p1 = obj.points[0]; // Origine
-    const p2 = obj.points[1]; // Direction
+    const p1 = obj.points[0];
+    const p2 = obj.points[1];
 
-    // Calculs Vecteurs
+    const GAP = ABILITY_SIZES['breach_e_gap'] * mapScale;
+    const WIDTH = ABILITY_SIZES['breach_e_width'] * mapScale;
+    const MAX_LEN = ABILITY_SIZES['breach_e_max_length'] * mapScale;
+
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
+    const dist = Math.sqrt(dx*dx + dy*dy);
 
-    // Clamping
-    const renderDistance = Math.min(distance, MAX_LEN);
-    const rectLength = Math.max(0, renderDistance - GAP);
+    // Clamping VISUEL (le dessin s'arrête au max, même si P2 est plus loin)
+    const renderDist = Math.min(dist, MAX_LEN);
+    const rectLength = Math.max(0, renderDist - GAP);
 
     ctx.save();
-
-    // --- ZONE (Rectangle) ---
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
@@ -38,83 +32,65 @@ export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject
     }
     ctx.restore();
 
-    // --- CONTROLES ---
-    // A. Origine
-    ctx.save();
+    // P1
     ctx.beginPath();
     ctx.fillStyle = 'white';
     ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
 
-    // B. Handle (Losange)
-    const endX = p1.x + Math.cos(angle) * renderDistance;
-    const endY = p1.y + Math.sin(angle) * renderDistance;
+    // P2 (Handle Visuel) - Il doit suivre le bout du dessin
+    const handleX = p1.x + Math.cos(angle) * renderDist;
+    const handleY = p1.y + Math.sin(angle) * renderDist;
 
     ctx.save();
-    ctx.translate(endX, endY);
+    ctx.translate(handleX, handleY);
     ctx.rotate(angle + Math.PI / 4);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
     ctx.strokeStyle = '#fca5a5';
     ctx.lineWidth = 1;
-    const diamondSize = 10;
     ctx.beginPath();
-    ctx.rect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
+    ctx.rect(-5, -5, 10, 10);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
 };
 
-/**
- * Vérifie si on clique sur les contrôles du Stun
- */
 export const checkBreachStunHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
-): { mode: 'center' | 'handle', offset?: { x: number, y: number } } | null => {
+    obj: DrawingObject,
+    mapScale: number = 1.0
+) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
 
-    // Calcul position visuelle du handle
+    const MAX_LEN = ABILITY_SIZES['breach_e_max_length'] * mapScale;
+
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    // On doit chercher le handle là où il est dessiné (clamped)
     const renderDist = Math.min(dist, MAX_LEN);
-    const visualHandleX = p1.x + Math.cos(angle) * renderDist;
-    const visualHandleY = p1.y + Math.sin(angle) * renderDist;
+    const handleX = p1.x + Math.cos(angle) * renderDist;
+    const handleY = p1.y + Math.sin(angle) * renderDist;
 
-    // 1. Clic Handle (Losange)
-    if (Math.hypot(pos.x - visualHandleX, pos.y - visualHandleY) < 20) {
-        return { mode: 'handle' };
-    }
-
-    // 2. Clic Origine (Rond)
-    if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 15) {
-        return {
-            mode: 'center',
-            offset: { x: pos.x - p1.x, y: pos.y - p1.y }
-        };
-    }
-
+    if (Math.hypot(pos.x - handleX, pos.y - handleY) < 20) return { mode: 'handle' };
+    if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 20) return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
     return null;
 };
 
-/**
- * Calcule les nouveaux points lors du déplacement
- */
 export const updateBreachStunPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'handle',
-    dragOffset: { x: number, y: number }
-): DrawingObject => {
+    dragOffset: { x: number, y: number },
+) => {
     if (mode === 'handle') {
-        // On déplace juste P2
+        // Pour le stun, on laisse P2 libre (la souris), le dessin et le hit clamperont
         return { ...obj, points: [obj.points[0], { x: pos.x, y: pos.y }] };
     }
     if (mode === 'center') {
-        // On déplace tout depuis P1
         const p1 = obj.points[0];
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;

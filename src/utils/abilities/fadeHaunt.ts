@@ -6,13 +6,14 @@ export const drawFadeHaunt = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
-    const radius = ABILITY_SIZES['fade_e_radius'] || 280;
-    const iconSize = ABILITY_SIZES['fade_e_icon_size'] || 50;
+    const radius = ABILITY_SIZES['fade_e_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['fade_e_icon_size'] * mapScale;
 
     ctx.save();
 
@@ -69,7 +70,7 @@ export const checkFadeHauntHit = (
 export const updateFadeHauntPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     return { ...obj, points: [{ x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }] };
 };

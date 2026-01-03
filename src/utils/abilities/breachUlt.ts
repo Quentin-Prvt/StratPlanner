@@ -1,17 +1,22 @@
 import type { DrawingObject } from '../../types/canvas';
-
-// --- CONSTANTES DE TAILLE FIXE (Pour la map Ascent) ---
-const GAP = 105;         // Espace avant le début du rectangle
-const WIDTH = 220;       // Largeur du rectangle (très large)
-const FIXED_LENGTH = 500; // Longueur FIXE totale (gap inclus)
+import { ABILITY_SIZES } from '../abilitySizes';
 
 /**
  * Dessine l'Ultime de Breach (Rolling Thunder)
  */
-export const drawBreachUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
+export const drawBreachUlt = (
+    ctx: CanvasRenderingContext2D,
+    obj: DrawingObject,
+    mapScale: number = 1.0
+) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0]; // Origine (Breach)
     const p2 = obj.points[1]; // Direction (Handle)
+
+    // Récupération des tailles depuis ABILITY_SIZES avec application du scale
+    const GAP = ABILITY_SIZES['breach_x_gap'] * mapScale;
+    const WIDTH = ABILITY_SIZES['breach_x_width'] * mapScale;
+    const FIXED_LENGTH = ABILITY_SIZES['breach_x_fixed_length'] * mapScale;
 
     // Calculs Vecteurs
     const dx = p2.x - p1.x;
@@ -100,9 +105,11 @@ export const updateBreachUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     mode: 'center' | 'handle',
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
+    mapScale: number = 1.0
 ): DrawingObject => {
     const p1 = obj.points[0];
+    const FIXED_LENGTH = ABILITY_SIZES['breach_x_fixed_length'] * mapScale;
 
     if (mode === 'handle') {
         // --- ROTATION AVEC DISTANCE FIXE ---
@@ -124,7 +131,6 @@ export const updateBreachUltPosition = (
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
-        // P2 suit P1 en gardant le même vecteur relatif
         return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
     }
     return obj;

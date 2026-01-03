@@ -1,4 +1,3 @@
-// Importation de toutes les images
 import ascentMap from '../assets/maps/ascent.svg';
 import bindMap from '../assets/maps/bind.svg';
 import breezeMap from '../assets/maps/breeze.svg';
@@ -12,21 +11,24 @@ import splitMap from '../assets/maps/split.svg';
 import sunsetMap from '../assets/maps/sunset.svg';
 import abyssMap from '../assets/maps/abyss.svg';
 
-// Définition du type pour l'objet Map
-export const MAPS_REGISTRY: Record<string, string> = {
-    ascent: ascentMap,
-    bind: bindMap,
-    breeze: breezeMap,
-    corrode: corrodeMap,
-    fracture: fractureMap,
-    haven: havenMap,
-    icebox: iceboxMap,
-    lotus: lotusMap,
-    pearl: pearlMap,
-    split: splitMap,
-    sunset: sunsetMap,
-    abyss: abyssMap,
+export interface MapConfig {
+    src: string;
+    scale: number;
+}
+
+export const MAP_CONFIGS: Record<string, MapConfig> = {
+    ascent:   { src: ascentMap,   scale: 1 },
+    bind:     { src: bindMap,     scale: 0.813 },
+    breeze:   { src: breezeMap,   scale: 0.92 },
+    fracture: { src: fractureMap, scale: 1.089 },
+    haven:    { src: havenMap,    scale: 1.14 },
+    icebox:   { src: iceboxMap,   scale: 1.093 },
+    lotus:    { src: lotusMap,    scale: 1.075  },
+    pearl:    { src: pearlMap,    scale: 0.96 },
+    split:    { src: splitMap,    scale: 1.08 },
+    sunset:   { src: sunsetMap,   scale: 1.02 },
+    abyss:    { src: abyssMap,    scale: 0.97},
+    corrode:  { src: corrodeMap,  scale: 0.88 },
 };
 
-// Liste pour l'affichage dans le menu (Home)
-export const AVAILABLE_MAPS = Object.keys(MAPS_REGISTRY);
+export const AVAILABLE_MAPS = Object.keys(MAP_CONFIGS);

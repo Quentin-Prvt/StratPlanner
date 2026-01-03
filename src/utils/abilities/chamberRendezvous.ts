@@ -9,14 +9,15 @@ export const drawChamberRendezvous = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    showZones: boolean
+    showZones: boolean,
+    mapScale: number = 1.0
 ) => {
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
     // Récupération des tailles configurées
-    const radius = ABILITY_SIZES['chamber_e_radius'] || 380;
-    const iconSize = ABILITY_SIZES['chamber_e_icon_size'] || 50;
+    const radius = ABILITY_SIZES['chamber_e_radius'] * mapScale;
+    const iconSize = ABILITY_SIZES['chamber_e_icon_size'] * mapScale;
 
     ctx.save();
 
@@ -68,10 +69,11 @@ export const drawChamberRendezvous = (
  */
 export const checkChamberRendezvousHit = (
     pos: { x: number, y: number },
-    obj: DrawingObject
+    obj: DrawingObject,
+    mapScale: number = 1.0
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['chamber_e_radius'] || 380;
+    const radius = ABILITY_SIZES['chamber_e_radius'] * mapScale;
 
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
         return {
@@ -88,7 +90,7 @@ export const checkChamberRendezvousHit = (
 export const updateChamberRendezvousPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
-    dragOffset: { x: number, y: number }
+    dragOffset: { x: number, y: number },
 ): DrawingObject => {
     const newCenter = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
     return { ...obj, points: [newCenter] };
