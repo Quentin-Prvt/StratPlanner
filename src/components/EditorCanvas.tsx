@@ -142,7 +142,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize);
         }, [drawings, draggingObjectId, showZones, currentMapSrc, iconSize]);
 
-    useEffect(() => { redrawMainCanvas(); }, [drawings, redrawMainCanvas, draggingObjectId]);
 
     const syncCanvasSize = useCallback(() => {
         const main = mainCanvasRef.current;
@@ -513,10 +512,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     return (
         <div className="flex flex-col lg:flex-row h-full w-full
           bg-[#121212]
-            bg-[linear-gradient(0deg,rgba(255,255,255,0.03),rgba(0,0,0,0.05)),
-            radial-gradient(circle_at_10%_20%,rgba(255,255,255,0.04),transparent_35%),
-            radial-gradient(circle_at_90%_80%,rgba(0,0,0,0.5),transparent_45%),
-            linear-gradient(180deg,rgba(0,0,0,0.6),transparent)]">
+            ">
             <div className="absolute top-4 left-4 z-30 lg:static lg:h-full lg:w-auto lg:p-4 lg:bg-[#181b1e] lg:border-r lg:border-gray-800">
                 <ToolsSidebar
                     currentTool={currentTool} setTool={setCurrentTool}
@@ -543,7 +539,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                             src={currentMapSrc}
                             alt="Map"
                             draggable={false}
-                            className="block select-none pointer-events-none h-auto shadow-lg p-10"
+                            className="block select-none pointer-events-none h-auto shadow-lg p-50"
                             style={{ width: '100%', minWidth: '1024px' }}
                             onLoad={syncCanvasSize}
                         />                    )}

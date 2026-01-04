@@ -12,7 +12,9 @@ export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     // Récupération des config
     const length = ABILITY_SIZES['deadlock_q_length'] * mapScale;
     const width = ABILITY_SIZES['deadlock_q_width'] * mapScale;
-    const iconSize = ABILITY_SIZES['deadlock_q_icon_size'] * mapScale;
+
+    // MODIFICATION : On réduit la taille du carré (x0.6) pour qu'il soit plus discret
+    const iconSize = (ABILITY_SIZES['deadlock_q_icon_size'] * 0.5) * mapScale;
 
     // Calcul de l'angle de rotation
     const dx = handle.x - center.x;
@@ -41,12 +43,12 @@ export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     // Reset du style pour les éléments solides
     ctx.setLineDash([]);
     ctx.shadowColor = '#22d3ee';
-    ctx.shadowBlur = 10;
+
 
     // B. Le Capteur (Icone/Carré au centre)
     // Note: on est toujours dans le repère rotaté
     ctx.beginPath();
-    ctx.rect(-iconSize / 2, -iconSize / 2, iconSize, iconSize);
+    ctx.rect(- iconSize / 2, -iconSize / 2, iconSize, iconSize);
     ctx.fillStyle = '#0e7490'; // Cyan foncé
     ctx.fill();
     ctx.strokeStyle = '#22d3ee';
@@ -56,7 +58,7 @@ export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     // C. La Poignée de rotation (au bout, pour visualiser la direction)
     // On la dessine à la distance "length" sur l'axe X (car on a rotaté)
     ctx.beginPath();
-    ctx.arc(length, 0, 6, 0, Math.PI * 2);
+    ctx.arc(length, 0, 5, 0, Math.PI * 2); // J'ai aussi réduit un peu la poignée (6 -> 5)
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.strokeStyle = '#22d3ee';

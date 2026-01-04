@@ -28,14 +28,7 @@ export const drawFadeSeize = (
         ctx.fill();
         ctx.stroke();
     }
-    // Bordure stylisée intérieure
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius * 0.92, 0, Math.PI * 2);
-    ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.setLineDash([]);
+
 
     // 2. Icône Centrale
     if (imageCache) {

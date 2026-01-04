@@ -110,12 +110,10 @@ export const updateAstraWallPosition = (
         const cy = wallCenterStart.y;
         const vectorX = pos.x - cx;
         const vectorY = pos.y - cy;
-        // p1 est le miroir de p2(souris) par rapport au centre
         return { ...obj, points: [{ x: cx - vectorX, y: cy - vectorY }, { x: pos.x, y: pos.y }] };
     }
 
     if (mode === 'center') {
-        // Translation pure
         const p1 = obj.points[0];
         const p2 = obj.points[1];
         const currentMidX = (p1.x + p2.x) / 2;

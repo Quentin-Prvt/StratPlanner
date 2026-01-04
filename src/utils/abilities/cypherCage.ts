@@ -26,17 +26,9 @@ export const drawCypherCage = (
 
     // Effet de "glow" technologique
     ctx.shadowColor = '#22d3ee';
-    ctx.shadowBlur = 10;
+
 
     ctx.fill();
-    ctx.stroke();
-
-    // --- Anneau intérieur (style "tech") ---
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius * 0.9, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([5, 5]); // Pointillés
     ctx.stroke();
 
     // --- Centre (le dispositif au sol) ---
@@ -44,7 +36,7 @@ export const drawCypherCage = (
     ctx.setLineDash([]); // Reset des pointillés
 
     ctx.beginPath();
-    ctx.arc(center.x, center.y, 6, 0, Math.PI * 2);
+    ctx.arc(center.x, center.y, 1, 0, Math.PI * 2);
     ctx.fillStyle = '#0e7490'; // Cyan foncé
     ctx.fill();
     ctx.strokeStyle = '#22d3ee';

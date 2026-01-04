@@ -50,6 +50,7 @@ export const useSupabaseStrategies = () => {
                 user_id: user.id,
                 map_name: mapName,
                 title: title,
+                name: title,
                 data: [],
                 folder_id: null
             }])
@@ -57,7 +58,7 @@ export const useSupabaseStrategies = () => {
             .single();
 
         if (error) {
-            console.error(error);
+            console.error("Erreur création strat:", error); // Ajoute ce log pour mieux voir
             return null;
         }
         return data;

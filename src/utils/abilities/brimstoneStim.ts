@@ -1,7 +1,7 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
 
-const BEACON_IMAGE_SIZE = 50;
+const BEACON_IMAGE_SIZE = 20;
 
 export const drawBrimstoneStim = (
     ctx: CanvasRenderingContext2D,

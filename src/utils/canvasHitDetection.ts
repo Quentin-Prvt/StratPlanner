@@ -30,6 +30,8 @@ import { checkVetoHit, updateVetoPosition } from './abilities/vetoAbilities';
 import { checkViperHit, updateViperPosition } from './abilities/viperAbilities';
 import { checkVyseHit, updateVysePosition } from './abilities/vyseAbilities';
 import { checkWaylayHit, updateWaylayPosition } from './abilities/waylayAbilities';
+import { checkHarborUltHit, updateHarborUltPosition } from './abilities/harborUlt';
+
 
 export interface HitResult {
     id: number;
@@ -58,6 +60,7 @@ export const checkAbilityHit = (pos: {x: number, y: number}, obj: DrawingObject)
     if (obj.tool === 'fade_q_zone') { const hit = checkFadeSeizeHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'fade_e_zone') { const hit = checkFadeHauntHit(pos, obj); return hit ? { id: obj.id, mode: 'center', offset: hit.offset } : null; }
     if (obj.tool === 'gekko_q_wingman') { const hit = checkGekkoQHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
+    if (obj.tool === 'harbor_x_zone') { const hit = checkHarborUltHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { const hit = checkIsoHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { const hit = checkKayoHit(pos, obj); return hit ? { id: obj.id, mode: 'center', offset: hit.offset } : null; }
     if (obj.tool.startsWith('killjoy_')) { const hit = checkKilljoyHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
@@ -101,6 +104,7 @@ export const updateAbilityPosition = (
     if (obj.tool === 'fade_q_zone') return updateFadeSeizePosition(obj, pos, dragOffset);
     if (obj.tool === 'fade_e_zone') return updateFadeHauntPosition(obj, pos, dragOffset);
     if (obj.tool === 'gekko_q_wingman') return updateGekkoQPosition(obj, pos, specialDragMode as 'center'|'rotate', dragOffset);
+    if (obj.tool === 'harbor_x_zone') return updateHarborUltPosition(obj, pos, specialDragMode as any, dragOffset);
     if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) return updateIsoPosition(obj, pos, specialDragMode as any, dragOffset);
     if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') return updateKayoPosition(obj, pos, dragOffset);
     if (obj.tool.startsWith('killjoy_')) return updateKilljoyPosition(obj, pos, specialDragMode as any, dragOffset);

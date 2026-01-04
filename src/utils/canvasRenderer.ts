@@ -31,6 +31,7 @@ import { drawVetoZone } from './abilities/vetoAbilities';
 import { drawViperWall } from './abilities/viperAbilities';
 import { drawVyseWall, drawVyseUltZone } from './abilities/vyseAbilities';
 import { drawWaylayUlt } from './abilities/waylayAbilities';
+import { drawHarborUlt} from "./abilities/harborUlt.ts";
 
 /**
  * Fonction principale qui dessine tout sur le canvas
@@ -43,7 +44,7 @@ export const renderDrawings = (
     draggingObjectId: number | null,
     showZones: boolean = true,
     mapScale: number = 1.0,
-    globalIconSize: number = 30
+    globalIconSize: number = 20
 ) => {
     // 1. Nettoyage du canvas
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -100,7 +101,8 @@ export const renderDrawings = (
         if (obj.tool === 'fade_e_zone') { drawFadeHaunt(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
         if (obj.tool === 'fade_q_zone') { drawFadeSeize(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
         if (obj.tool === 'gekko_q_wingman') { drawGekkoQ(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
-        if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); return; }
+        if (obj.tool === 'harbor_x_zone') {drawHarborUlt(ctx, obj, mapScale); return; }
+        if (['iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); return; }
         if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { drawKayoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
         if (obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') { drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
         if (obj.tool === 'killjoy_e_turret') { drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, mapScale); return; }

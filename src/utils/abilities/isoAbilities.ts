@@ -6,13 +6,6 @@ import { ABILITY_SIZES } from '../abilitySizes';
  */
 const getIsoConfig = (tool: string, mapScale: number = 1.0) => {
     switch (tool) {
-        case 'iso_c_wall':
-            return {
-                width: ABILITY_SIZES['iso_c_width'] * mapScale,
-                length: ABILITY_SIZES['iso_c_length'] * mapScale,
-                color: 'rgba(139, 92, 246, 0.4)',
-                stroke: '#8b5cf6'
-            };
         case 'iso_q_zone':
             return {
                 width: ABILITY_SIZES['iso_q_width'] * mapScale,

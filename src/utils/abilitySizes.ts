@@ -1,64 +1,63 @@
 export const ABILITY_SIZES: Record<string, number> = {
+
+
     // --- BREACH ---
-    'breach_c_width': 60,
-    'breach_c_length': 180,
-    'breach_c_wall_gap': 30,
-    'breach_c_handle_dist': 100,
-
+    'breach_c_width': 28,
+    'breach_c_length': 55,
+    'breach_c_wall_gap': 1,
+    'breach_c_handle_dist': 56,
     'breach_q': 30,
-
-    'breach_e_width': 90,
-    'breach_e_max_length': 670,
-    'breach_e_gap': 105,
-
-    // BREACH ULT (Rolling Thunder)
-    'breach_x_width': 135,        // Largeur du rectangle 135
-    'breach_x_gap': 68,          // Espace avant le début du rectangle 66
-    'breach_x_fixed_length': 302, // Longueur FIXE totale (gap inclus) 305
+    'breach_e_width': 40,
+    'breach_e_max_length': 280,
+    'breach_e_gap': 42,
+    'breach_x_width': 84,        // Largeur du rectangle 135
+    'breach_x_gap': 42,          // Espace avant le début du rectangle 66
+    'breach_x_fixed_length': 200, // Longueur FIXE totale (gap inclus) 305
 
     // ASTRA
-    'astra_c': 120, 'astra_q': 120, 'astra_e': 120,
+    'astra_c': 70, 'astra_q': 55, 'astra_e': 60,
 
     // BRIMSTONE
-    'brimstone_c_radius': 70,
-    'brimstone_c_icon_size': 50,
-    'brimstone_e': 150,
-    'brimstone_q': 140,
-    'brimstone_x_radius': 100,
+    'brimstone_c_radius': 35,
+    'brimstone_c_icon_size': 20,
+    'brimstone_e': 65,
+    'brimstone_q': 65,
+    'brimstone_x_radius': 42,
 
     // CHAMBER
-    'chamber_q': 30, 'chamber_x': 30,
-    'chamber_c_radius': 100, 'chamber_c_icon_size': 30,
-    'chamber_e_radius': 220, 'chamber_e_icon_size': 30,
+    'chamber_q': 20, 'chamber_x': 20,
+    'chamber_c_radius': 46, 'chamber_c_icon_size': 20,
+    'chamber_e_radius': 95, 'chamber_e_icon_size': 20,
 
     // CLOVE
-    'clove_c': 30, 'clove_x': 30, 'clove_q': 130, 'clove_e': 140,
+    'clove_c': 20, 'clove_x': 20, 'clove_q': 70, 'clove_e': 67,
 
     // CYPHER
-    'cypher_c_max_length': 200, 'cypher_c_box_size': 14,
-    'cypher_q_radius': 60, 'cypher_e': 30, 'cypher_x': 30,
+    'cypher_c_max_length': 94, 'cypher_c_box_size': 8,
+    'cypher_q_radius': 18, 'cypher_e': 20, 'cypher_x': 20,
 
     // DEADLOCK
-    'deadlock_e': 150, 'deadlock_c_radius': 150, 'deadlock_c_node_size': 16,
-    'deadlock_q_length': 100, 'deadlock_q_width': 80, 'deadlock_q_icon_size': 20,
+    'deadlock_e': 150, 'deadlock_c_radius': 60, 'deadlock_c_node_size': 10, 'deadlock_c_max_length':60,
+    'deadlock_q_length': 50, 'deadlock_q_width': 40, 'deadlock_q_icon_size': 20,
     'deadlock_x': 30,
 
     // FADE
-    'fade_c': 30, 'fade_x_width': 250, 'fade_x_length': 470,
-    'fade_q_radius': 75, 'fade_q_icon_size': 30,
-    'fade_e_radius': 333, 'fade_e_icon_size': 30,
+    'fade_c': 30, 'fade_x_width': 110, 'fade_x_length': 200,
+    'fade_q_radius': 30, 'fade_q_icon_size': 20,
+    'fade_e_radius': 140, 'fade_e_icon_size': 20,
 
     // GEKKO
-    'gekko_c': 130, 'gekko_e': 30, 'gekko_x': 30,
-    'gekko_q_size': 60, 'gekko_q_handle_dist': 60,
+    'gekko_c': 75, 'gekko_e': 20, 'gekko_x': 20,
+    'gekko_q_size': 50, 'gekko_q_handle_dist': 40,
 
     // HARBOR
-    'harbor_c': 160, 'harbor_e': 130,
+    'harbor_c': 100, 'harbor_e': 70,
+    'harbor_x_width': 100,
+    'harbor_x_length': 250,
 
     // ISO
-    'iso_c_width': 120, 'iso_c_length': 400,
-    'iso_q_width': 80, 'iso_q_length': 500,
-    'iso_e': 30, 'iso_x_width': 300, 'iso_x_length': 800,
+    'iso_q_width': 30, 'iso_q_length': 175,
+    'iso_e': 30, 'iso_x_width': 70, 'iso_x_length': 185,
 
     // JETT
     'jett_c': 100, 'jett_q': 30, 'jett_e': 30, 'jett_x': 30,

@@ -51,7 +51,7 @@ function App() {
 
                         {/* --- ROUTES PROTÉGÉES --- */}
 
-                        {/* 1. Dashboard (Racine) : Liste des dossiers et stratégies */}
+                        {/* 1. Dashboard : Liste des dossiers et stratégies */}
                         <Route path="/" element={
                             <ProtectedRoute>
                                 <Dashboard />

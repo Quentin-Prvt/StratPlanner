@@ -15,12 +15,11 @@ export const drawDeadlockWall = (
     const center = obj.points[0];
     const arms = [obj.points[1], obj.points[2], obj.points[3], obj.points[4]];
 
-    const nodeSize = ABILITY_SIZES['deadlock_c_node_size'] * mapScale;
+    const nodeSize = (ABILITY_SIZES['deadlock_c_node_size'] || 16) * mapScale;
 
     ctx.save();
     ctx.lineCap = 'round';
     ctx.shadowColor = '#22d3ee';
-    ctx.shadowBlur = 10;
 
     // Dessiner chaque bras
     arms.forEach(arm => {
@@ -79,16 +78,20 @@ export const checkDeadlockWallHit = (
 };
 
 /**
- * 3. UPDATE : Rotation liée mais Longueur indépendante
+ * 3. UPDATE : Rotation liée, Longueur indépendante MAIS Clampée
  */
 export const updateDeadlockWallPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
     pointIndex: number, // 0 = centre, 1,2,3,4 = bras
     dragOffset: { x: number, y: number },
+    mapScale: number = 1.0 // Ajout du mapScale pour calculer la taille max
 ): DrawingObject => {
     const points = [...obj.points];
     const center = points[0];
+
+    // Définition de la taille max (tu peux ajuster 280 ou le mettre dans abilitySizes)
+    const MAX_LEN = (ABILITY_SIZES['deadlock_c_max_length'] || 300) * mapScale;
 
     // CAS 1 : Déplacement du centre (tout bouge ensemble)
     if (pointIndex === 0) {
@@ -101,31 +104,39 @@ export const updateDeadlockWallPosition = (
         return { ...obj, points: newPoints };
     }
 
-
-
+    // CAS 2 : Déplacement d'un bras
     const draggedArmIndex = pointIndex;
 
-    // 1. Calculer le nouvel angle et la nouvelle longueur du bras tiré
+    // 1. Calculs vectoriels souris <-> centre
     const dx = pos.x - center.x;
     const dy = pos.y - center.y;
-    const baseAngle = Math.atan2(dy, dx); // Nouvel angle de référence
+    const baseAngle = Math.atan2(dy, dx);
+    const rawDist = Math.sqrt(dx * dx + dy * dy);
 
-    // On met à jour le point tiré directement à la souris
-    points[draggedArmIndex] = { x: pos.x, y: pos.y };
+    // 2. Clamping de la distance (taille max)
+    const clampedDist = Math.min(rawDist, MAX_LEN);
 
+    // 3. Mise à jour du bras tiré (Angle souris + Distance clampée)
+    points[draggedArmIndex] = {
+        x: center.x + Math.cos(baseAngle) * clampedDist,
+        y: center.y + Math.sin(baseAngle) * clampedDist
+    };
 
-    // Index des bras dans le tableau points : 1, 2, 3, 4.
-    // On normalise l'index de 0 à 3 pour les calculs d'angle
-    const logicIndex = draggedArmIndex - 1;
+    // 4. Mise à jour des autres bras (Rotation solidaire)
+    const logicIndex = draggedArmIndex - 1; // 0..3
 
     for (let i = 1; i <= 4; i++) {
-        if (i === draggedArmIndex) continue; // Déjà traité
+        if (i === draggedArmIndex) continue; // Celui qu'on tire est déjà fait
 
-        // Récupérer la longueur actuelle de ce bras (on ne la change pas !)
-        const currentLen = Math.hypot(points[i].x - center.x, points[i].y - center.y);
+        // On récupère la longueur actuelle de ce bras
+        const armDx = points[i].x - center.x;
+        const armDy = points[i].y - center.y;
+        let currentLen = Math.sqrt(armDx * armDx + armDy * armDy);
 
-        // Calculer son angle théorique par rapport au bras qu'on tire
-        // Différence d'index * 90 degrés (PI/2)
+        // Sécurité : Si l'autre bras dépassait déjà la taille max (ex: changement de zoom), on le réduit aussi
+        currentLen = Math.min(currentLen, MAX_LEN);
+
+        // Calcul de l'angle relatif (croix parfaite à 90 degrés)
         const angleDiff = (i - 1 - logicIndex) * (Math.PI / 2);
         const targetAngle = baseAngle + angleDiff;
 

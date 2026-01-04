@@ -56,7 +56,7 @@ export const drawGekkoQ = (
     ctx.strokeStyle = '#be123c'; // Bordure rose foncé
     ctx.lineWidth = 2;
 
-    const diamondSize = 12;
+    const diamondSize = 8;
     ctx.beginPath();
     // Un rect tourné de 45deg fait un losange
     ctx.rect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);

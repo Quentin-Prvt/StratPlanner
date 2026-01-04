@@ -38,7 +38,7 @@ export const createDrawingFromDrop = (
         id,
         tool: 'breach_x_zone',
         subtype: 'ability',
-        points: [{x, y}, {x, y: y - 400}],
+        points: [{x, y}, {x, y: y - 305}],
         color: '#ef4444',
         thickness: 0,
         opacity: 0.8
@@ -47,7 +47,7 @@ export const createDrawingFromDrop = (
         id,
         tool: 'breach_c_zone',
         subtype: 'ability',
-        points: [{x, y}, {x, y: y - 150}],
+        points: [{x, y}, {x, y: y - 80}],
         color: '#f59e0b',
         thickness: 0,
         opacity: 0.8
@@ -208,26 +208,35 @@ export const createDrawingFromDrop = (
             opacity: 1
         };
     }
+    if (name === 'harbor_x') {
+        const length = 100;
+        return {
+            id,
+            tool: 'harbor_x_zone',
+            subtype: 'ability',
+            points: [{x, y}, {x: x + length, y }],
+            color: '#22d3ee',
+            thickness: 0,
+            opacity: 0.8
+        }
+
+    }
 
     // --- ISO ---
-    if (['iso_c', 'iso_q', 'iso_x'].includes(name)) {
+    if (['iso_q', 'iso_x'].includes(name)) {
         let length = 400;
-        let toolName: StrokeType = 'iso_c_wall';
+        let toolName: StrokeType = 'iso_q_zone';
         let color = '#8b5cf6';
 
-        if (name === 'iso_c') {
-            length = ABILITY_SIZES['iso_c_length'] || 400;
-            toolName = 'iso_c_wall';
-        }
         if (name === 'iso_q') {
             length = ABILITY_SIZES['iso_q_length'] || 500;
             toolName = 'iso_q_zone';
-            color = '#6d28d9';
+            color = '#8b5cf6';
         }
         if (name === 'iso_x') {
             length = ABILITY_SIZES['iso_x_length'] || 800;
             toolName = 'iso_x_zone';
-            color = '#3b82f6';
+            color = '#8b5cf6';
         }
 
         return {
@@ -529,7 +538,7 @@ export const createDrawingFromDrop = (
     const useIconFile = ['breach_q',
         'neon_e', 'neon_x', 'kayo_q', 'jett_q', 'jett_e', 'jett_x', 'chamber_q', 'chamber_x', 'clove_c', 'clove_x', 'cypher_e', 'cypher_x', 'deadlock_x', 'fade_c', 'gekko_e', 'gekko_x', 'iso_e',
         'omen_c', 'omen_x', 'phoenix_c', 'phoenix_e', 'phoenix_x', 'raze_q', 'raze_e', 'raze_x', 'reyna_q', 'reyna_e', 'reyna_x', 'sage_e', 'sage_x', 'skye_c', 'skye_q', 'skye_e', 'skye_x', 'sova_c',
-        'tejo_c', 'veto_x', 'vyse_e', 'yoru_c', 'yoru_q', 'yoru_e', 'yoru_x', 'waylay_q', 'waylay_e'
+        'tejo_c', 'veto_x', 'vyse_e', 'yoru_c', 'yoru_q', 'yoru_e', 'yoru_x', 'waylay_q', 'waylay_e', 'harbor_q', 'iso_c'
     ];
 
     const suffix = useIconFile.includes(name) ? '_icon' : '_game';
