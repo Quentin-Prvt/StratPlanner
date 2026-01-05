@@ -32,7 +32,8 @@ import { drawVetoZone } from './abilities/vetoAbilities';
 import { drawViperWall } from './abilities/viperAbilities';
 import { drawVyseWall, drawVyseUltZone } from './abilities/vyseAbilities';
 import { drawWaylayUlt } from './abilities/waylayAbilities';
-import { drawHarborUlt} from "./abilities/harborUlt.ts";
+import { drawHarborUlt} from "./abilities/harborUlt";
+import { drawViperUlt} from "./abilities/viperUlt";
 
 /**
  * Fonction principale qui dessine tout sur le canvas
@@ -57,29 +58,66 @@ export const renderDrawings = (
         // --- A. TEXTE ---
         if (obj.tool === 'text' && obj.text && obj.x !== undefined && obj.y !== undefined) {
             ctx.save();
-            const fontSize = obj.fontSize || 20;
+
+            // --- FIX TYPESCRIPT ---
+            // On capture les valeurs ici. TypeScript saura que ce sont des 'number' (pas undefined)
+            // et cette information sera conservée à l'intérieur du forEach.
+            const textX = obj.x;
+            const textY = obj.y;
+
+            const fontSize = (obj.fontSize || 20) * mapScale;
             const fontWeight = obj.fontWeight || 'normal';
             const fontStyle = obj.fontStyle || 'normal';
+
             ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+
+            // Gestion du multilingue
+            const lines = obj.text.split('\n');
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = lines.length * lineHeight;
+
+            // Calcul du Y de départ basé sur textY
+            let startY = textY - (totalHeight / 2) + (lineHeight / 2);
+
+            // Ombre portée pour lisibilité
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
             ctx.lineWidth = 3;
             ctx.strokeStyle = 'black';
-            ctx.strokeText(obj.text, obj.x, obj.y);
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = obj.color;
-            ctx.fillText(obj.text, obj.x, obj.y);
 
+            lines.forEach((line, index) => {
+                const lineY = startY + (index * lineHeight);
+
+
+                ctx.strokeText(line, textX, lineY);
+
+                // Texte couleur
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = obj.color;
+                ctx.fillText(line, textX, lineY);
+
+                // Rétablir l'ombre
+                ctx.shadowBlur = 4;
+            });
+
+            // Cadre de sélection
             if (draggingObjectId === obj.id) {
-                const metrics = ctx.measureText(obj.text);
-                const width = metrics.width + 20;
-                const height = fontSize + 20;
+                let maxWidth = 0;
+                lines.forEach(line => {
+                    const metrics = ctx.measureText(line);
+                    if (metrics.width > maxWidth) maxWidth = metrics.width;
+                });
+
+                const width = maxWidth + 20;
+                const height = totalHeight + 20;
+
                 ctx.strokeStyle = '#22c55e';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([5, 5]);
-                ctx.strokeRect(obj.x - width/2, obj.y - height/2, width, height);
+                // Utilise textX / textY ici aussi
+                ctx.strokeRect(textX - width/2, textY - height/2, width, height);
             }
             ctx.restore();
             return;
@@ -105,14 +143,17 @@ export const renderDrawings = (
         if (obj.tool === 'harbor_x_zone') {drawHarborUlt(ctx, obj, mapScale); return; }
         if (['iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); return; }
         if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { drawKayoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
+
+        // KILLJOY (J'ai laissé l'ordre standard ici, modifie si besoin selon tes définitions)
         if (obj.tool === 'killjoy_c_zone' || obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') {
             drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale);
             return;
         }
         if (obj.tool === 'killjoy_e_turret') {
-            drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, mapScale, showZones);
+            drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw,  mapScale);
             return;
         }
+
         if (obj.tool === 'neon_c_wall') { drawNeonWall(ctx, obj, mapScale); return; }
         if (obj.tool === 'neon_q_zone') { drawNeonStun(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
         if (obj.tool === 'omen_q_zone') { drawOmenParanoia(ctx, obj, mapScale); return; }
@@ -123,11 +164,12 @@ export const renderDrawings = (
         if (obj.tool === 'tejo_x_zone') { drawTejoUlt(ctx, obj, mapScale); return; }
         if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) { drawVetoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
         if (obj.tool === 'viper_e_wall') { drawViperWall(ctx, obj, mapScale); return; }
+        if (obj.tool === 'viper_x_zone') {drawViperUlt(ctx, obj, imageCache, triggerRedraw, mapScale); return;}
         if (obj.tool === 'vyse_q_wall') { drawVyseWall(ctx, obj, mapScale); return; }
         if (obj.tool === 'vyse_x_zone') { drawVyseUltZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
         if (obj.tool === 'waylay_x_zone') { drawWaylayUlt(ctx, obj, mapScale); return; }
 
-        // --- C. IMAGES CLASSIQUES (Agents, Spells) & ICONES ---
+        // --- C. IMAGES CLASSIQUES ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             let img = imageCache.get(obj.imageSrc);
             if (!img) {
@@ -144,12 +186,9 @@ export const renderDrawings = (
 
                 let baseSize = obj.width || 50;
                 const isAgent = obj.subtype === 'agent';
-                // Détection si c'est une icône de compétence (pas une image in-game comme une smoke)
                 const isAbilityIcon = obj.subtype === 'ability' && (obj.imageSrc.includes('_icon') || !obj.imageSrc.includes('_game'));
 
-                if (isAgent || isAbilityIcon) {
-                    baseSize = globalIconSize;
-                }
+                if (isAgent || isAbilityIcon) baseSize = globalIconSize;
 
                 const targetSize = baseSize * mapScale;
                 const centerX = obj.x;
@@ -164,61 +203,45 @@ export const renderDrawings = (
                 ctx.save();
 
                 const isIconType = obj.subtype === 'icon';
-                // On met un cadre si c'est un agent ou une icône de compétence
                 const hasFrame = isAgent || (obj.imageSrc.includes('_icon') && !isIconType) || (obj.subtype === 'ability' && !obj.imageSrc.includes('_game'));
 
                 if (hasFrame) {
-                    // --- COULEUR DYNAMIQUE ---
-                    // On essaie de deviner le nom de l'agent depuis le nom de l'image (ex: "killjoy_c_icon" -> "killjoy")
-                    // Ou depuis l'imageSrc directe si c'est un agent (ex: "jett")
                     let agentName = obj.imageSrc.split('_')[0];
-                    if(isAgent) agentName = obj.imageSrc; // Si c'est un agent, le nom est direct
+                    if(isAgent) agentName = obj.imageSrc;
 
-                    const agentColor = getAgentColor(agentName); // Récupère la couleur HEX
-
+                    const agentColor = getAgentColor(agentName);
                     const boxSize = targetSize;
                     const frameX = centerX - boxSize/2;
                     const frameY = centerY - boxSize/2;
-                    const borderRadius = 6 * mapScale; // Arrondi qui scale aussi
+                    const borderRadius = 6 * mapScale;
 
                     ctx.beginPath();
                     // @ts-ignore
                     if (ctx.roundRect) ctx.roundRect(frameX, frameY, boxSize, boxSize, borderRadius);
                     else ctx.rect(frameX, frameY, boxSize, boxSize);
 
-                    // Fond coloré avec transparence (ex: Jaune Killjoy à 80% ou 100%)
-                    // Tu peux mettre 1.0 pour un fond plein, ou 0.8 pour laisser voir un peu le sol
                     ctx.fillStyle = hexToRgba(agentColor, 0.8);
                     ctx.fill();
 
-                    // On clippe l'image
                     ctx.save();
                     ctx.clip();
-
-                    // Optionnel : Dessiner un petit fond sombre derrière l'image pour le contraste si l'icône est blanche
-                    // ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                    // ctx.fillRect(frameX, frameY, boxSize, boxSize);
-
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                     ctx.restore();
 
-                    // Bordure
-                    ctx.strokeStyle = '#ffffff'; // Bord blanc pour faire ressortir la couleur
+                    ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 1.5 * mapScale;
                     ctx.shadowColor = '#000000';
                     ctx.shadowBlur = 4;
                     ctx.stroke();
                 } else {
-                    // DESSIN SANS CADRE (Smokes, etc.)
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                 }
 
                 ctx.restore();
 
-                // Cadre de sélection (Drag)
                 if (draggingObjectId === obj.id) {
                     ctx.save();
-                    ctx.strokeStyle = '#22c55e'; // Vert de sélection
+                    ctx.strokeStyle = '#22c55e';
                     ctx.lineWidth = 2;
                     ctx.setLineDash([5, 5]);
                     ctx.strokeRect(centerX - targetSize/2 - 4, centerY - targetSize/2 - 4, targetSize + 8, targetSize + 8);

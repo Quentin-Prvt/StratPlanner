@@ -31,6 +31,7 @@ import { checkViperHit, updateViperPosition } from './abilities/viperAbilities';
 import { checkVyseHit, updateVysePosition } from './abilities/vyseAbilities';
 import { checkWaylayHit, updateWaylayPosition } from './abilities/waylayAbilities';
 import { checkHarborUltHit, updateHarborUltPosition } from './abilities/harborUlt';
+import {checkViperUltHit, updateViperUltPosition} from "./abilities/viperUlt.ts";
 
 
 export interface HitResult {
@@ -72,6 +73,7 @@ export const checkAbilityHit = (pos: {x: number, y: number}, obj: DrawingObject)
     if (obj.tool === 'tejo_x_zone') { const hit = checkTejoUltHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) { const hit = checkVetoHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'viper_e_wall') { const hit = checkViperHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
+    if (obj.tool === 'viper_x_zone') { const hit = checkViperUltHit(pos,obj); return hit ? {id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool.startsWith('vyse_')) { const hit = checkVyseHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'waylay_x_zone') { const hit = checkWaylayHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
 
@@ -116,6 +118,7 @@ export const updateAbilityPosition = (
     if (obj.tool === 'tejo_x_zone') return updateTejoUltPosition(obj, pos, specialDragMode as any, dragOffset);
     if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) return updateVetoPosition(obj, pos, dragOffset);
     if (obj.tool === 'viper_e_wall') return updateViperPosition(obj, pos, specialDragMode as any, dragOffset);
+    if (obj.tool === 'viper_x_zone') return updateViperUltPosition(obj, pos, specialDragMode as string, dragOffset);
     if (obj.tool.startsWith('vyse_')) return updateVysePosition(obj, pos, specialDragMode as any, dragOffset);
     if (obj.tool === 'waylay_x_zone') return updateWaylayPosition(obj, pos, specialDragMode as any, dragOffset);
 

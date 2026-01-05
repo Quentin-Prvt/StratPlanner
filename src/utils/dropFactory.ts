@@ -483,6 +483,34 @@ export const createDrawingFromDrop = (
             opacity: 0.7
         };
     }
+    if (name === 'viper_x') {
+        const radius = 75;
+        const numPoints = 12;
+        const polyPoints = [];
+
+        // 1. Générer les points du polygone (Cercle initial)
+        for (let i = 0; i < numPoints; i++) {
+            const angle = (i / numPoints) * Math.PI * 2;
+            polyPoints.push({
+                x: x + Math.cos(angle) * radius,
+                y: y + Math.sin(angle) * radius
+            });
+        }
+
+
+        polyPoints.push({ x, y });
+
+        return {
+            id,
+            tool: 'viper_x_zone',
+            subtype: 'ability',
+            points: polyPoints,
+            color: '#4ade80',
+            thickness: 2,
+            opacity: 0.6,
+            imageSrc: 'viper_x_icon' // Assure-toi d'avoir cette image
+        };
+    }
 
     // --- VYSE ---
     if (name.startsWith('vyse_')) {

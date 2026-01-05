@@ -63,7 +63,7 @@ export const ABILITY_SIZES: Record<string, number> = {
     'jett_c': 45, 'jett_q': 20, 'jett_e': 20, 'jett_x': 20,
 
     // KAYO
-    'kayo_c': 60, 'kayo_q': 30,
+    'kayo_c': 90, 'kayo_q': 30,
     'kayo_e_radius': 120, 'kayo_e_icon_size': 20,
     'kayo_x_radius': 320, 'kayo_x_icon_size': 20,
 
@@ -93,7 +93,7 @@ export const ABILITY_SIZES: Record<string, number> = {
     'reyna_c':40, 'reyna_q':30, 'reyna_e':30, 'reyna_x':30,
 
     // SAGE
-    'sage_e':30, 'sage_x':30, 'sage_c_size': 110, 'sage_c_handle_dist': 70,
+    'sage_e':30, 'sage_x':30, 'sage_c_size': 110, 'sage_c_handle_dist': 40,
 
     // SKYE
     'skye_c': 30, 'skye_q': 30, 'skye_e': 30, 'skye_x':30,
@@ -116,6 +116,7 @@ export const ABILITY_SIZES: Record<string, number> = {
     // VIPER
     'viper_c': 80, 'viper_q': 80, 'viper_x': 160,
     'viper_e_length': 750, 'viper_e_width': 10,
+    'viper_x_vertex_radius': 5,'viper_x_vertex_hit_radius':10,
 
     // VYSE
     'vyse_c':80, 'vyse_e':30,

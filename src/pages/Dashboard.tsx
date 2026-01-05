@@ -1,35 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// FIX 1: Import 'Folder' as a type explicitly
 import { useSupabaseStrategies, type Folder } from '../hooks/useSupabase';
 import { MAP_CONFIGS } from '../utils/mapsRegistry';
 import { useAuth } from '../contexts/AuthContext';
-// FIX 3: Replaced 'FileMap' with 'Map' (or you can use 'File' or 'MapPin')
-import { FolderPlus, Trash2, Plus, LogOut, Folder as FolderIcon, FolderOpen, Map as MapIcon } from 'lucide-react';
+import {
+    FolderPlus, Trash2, Plus, LogOut, Folder as FolderIcon,
+    FolderOpen, Map as MapIcon, User
+} from 'lucide-react';
 
 export const Dashboard = () => {
     const navigate = useNavigate();
     const { signOut } = useAuth();
+
+    // --- HOOKS ---
     const {
         savedStrategies, folders, isLoading,
         fetchStrategies, fetchFolders, deleteStrategy, createFolder, deleteFolder, moveStrategy
     } = useSupabaseStrategies();
 
+    // --- STATE ---
     const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
     const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
 
+    // --- INITIALISATION ---
     useEffect(() => {
         fetchStrategies();
         fetchFolders();
     }, [fetchStrategies, fetchFolders]);
 
-    // Filtrer les stratégies selon le dossier courant
+    // --- FILTERING ---
     const filteredStrategies = savedStrategies.filter(s =>
-        (currentFolderId === null && s.folder_id === null) || // Racine
-        (s.folder_id === currentFolderId) // Dans un dossier
+        (currentFolderId === null && s.folder_id === null) ||
+        (s.folder_id === currentFolderId)
     );
 
+    // --- HANDLERS ---
     const handleCreateFolder = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newFolderName.trim()) {
@@ -39,7 +45,6 @@ export const Dashboard = () => {
         }
     };
 
-    // Drag and Drop pour déplacer dans un dossier
     const handleDragStart = (e: React.DragEvent, stratId: string) => {
         e.dataTransfer.setData("stratId", stratId);
     };
@@ -55,28 +60,37 @@ export const Dashboard = () => {
     const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
     return (
-        <div className="min-h-screen bg-[#121212] text-white flex">
+        <div className="min-h-screen bg-[#121212] text-white flex font-sans">
 
-            {/* --- SIDEBAR (DOSSIERS) --- */}
-            <div className="w-64 bg-[#181b1e] border-r border-gray-800 flex flex-col">
+            {/* --- SIDEBAR --- */}
+            <div className="w-72 bg-[#181b1e] border-r border-gray-800 flex flex-col">
                 <div className="p-6 border-b border-gray-800">
-                    <h1 className="text-xl font-black tracking-wider text-[#ff4655]">STRAT PLANNER</h1>
+                    <h1 className="text-xl font-black tracking-wider text-[#ff4655] italic">STRAT PLANNER</h1>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                <div className="p-4 border-b border-gray-800 space-y-2">
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Espace de travail</div>
+                    <div className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/50">
+                        <User size={18} />
+                        <span className="font-medium text-sm">Personnel</span>
+                    </div>
+                </div>
+
+                {/* FOLDERS LIST */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-1">
+                    <div className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">
+                        Fichiers
+                    </div>
+
                     <button
                         onClick={() => setCurrentFolderId(null)}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDropOnFolder(e, null)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${currentFolderId === null ? 'bg-[#ff4655] text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${currentFolderId === null ? 'bg-gray-800 text-white font-medium' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'}`}
                     >
-                        <FolderOpen size={20} />
-                        <span className="font-medium">Tous les fichiers</span>
+                        <FolderOpen size={18} className={currentFolderId === null ? "text-[#ff4655]" : ""} />
+                        <span>Tous les fichiers</span>
                     </button>
-
-                    <div className="pt-4 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">
-                        Dossiers
-                    </div>
 
                     {folders.map((folder: Folder) => (
                         <div
@@ -89,12 +103,12 @@ export const Dashboard = () => {
                                 onClick={() => setCurrentFolderId(folder.id)}
                                 className="flex items-center gap-3 flex-1 text-left truncate"
                             >
-                                <FolderIcon size={18} />
-                                <span>{folder.name}</span>
+                                <FolderIcon size={18} className={currentFolderId === folder.id ? "text-[#ff4655]" : ""} />
+                                <span className="truncate">{folder.name}</span>
                             </button>
                             <button
                                 onClick={(e) => { e.stopPropagation(); if(confirm('Supprimer ce dossier ?')) deleteFolder(folder.id); }}
-                                className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
+                                className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity p-1"
                             >
                                 <Trash2 size={14} />
                             </button>
@@ -103,7 +117,7 @@ export const Dashboard = () => {
 
                     <button
                         onClick={() => setIsCreateFolderModalOpen(true)}
-                        className="w-full flex items-center gap-2 px-4 py-2 mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors border border-dashed border-gray-700 rounded-lg hover:border-blue-400"
+                        className="w-full flex items-center gap-2 px-4 py-2 mt-4 text-sm text-gray-500 hover:text-[#ff4655] transition-colors"
                     >
                         <FolderPlus size={16} />
                         <span>Nouveau dossier</span>
@@ -118,34 +132,38 @@ export const Dashboard = () => {
             </div>
 
             {/* --- MAIN CONTENT --- */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden bg-[#0f1113]">
                 {/* Header */}
-                <div className="h-16 border-b border-gray-800 flex items-center justify-center px-8 bg-[#121212] relative">
-                    <h2 className="text-lg font-medium text-gray-200 absolute left-8">
-                        {currentFolderId === null ? 'Toutes les stratégies' : folders.find((f: Folder) => f.id === currentFolderId)?.name}
-                    </h2>
+                <div className="h-20 border-b border-gray-800 flex items-center justify-between px-8 bg-[#181b1e]">
+                    <div>
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            {currentFolderId === null ? <FolderOpen size={24} className="text-[#ff4655]" /> : <FolderIcon size={24} className="text-[#ff4655]" />}
+                            {currentFolderId === null ? 'Racine' : folders.find((f: Folder) => f.id === currentFolderId)?.name}
+                        </h2>
+                    </div>
+
                     <button
                         onClick={() => navigate('/create')}
-                        className="bg-[#ff4655] hover:bg-[#e03e4b] text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shadow-lg shadow-red-900/20 absolute right-8"
+                        className="bg-[#ff4655] hover:bg-[#e03e4b] text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-red-900/20"
                     >
-                        <Plus size={20} /> Nouvelle Stratégie
+                        <Plus size={20} /> <span className="hidden sm:inline">Nouvelle Stratégie</span>
                     </button>
                 </div>
 
-                {/* Grid */}
+                {/* Content Grid */}
                 <div className="flex-1 overflow-y-auto p-8">
                     {isLoading ? (
-                        <div className="text-center text-gray-500 mt-20">Chargement...</div>
+                        <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff4655]"></div></div>
                     ) : filteredStrategies.length === 0 ? (
-                        <div className="text-center mt-20">
-                            <div className="bg-gray-800/50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <MapIcon size={32} className="text-gray-500" />
+                        <div className="flex flex-col items-center justify-center h-[60vh] text-gray-500">
+                            <div className="bg-gray-800/50 p-6 rounded-full mb-4">
+                                <MapIcon size={48} className="text-gray-600" />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-300 mb-2">C'est vide ici</h3>
-                            <p className="text-gray-500">Créez une nouvelle stratégie pour commencer.</p>
+                            <h3 className="text-xl font-bold text-gray-300 mb-2">Aucune stratégie ici</h3>
+                            <p>Créez votre première stratégie pour commencer.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                             {filteredStrategies.map((strat) => {
                                 const mapConfig = MAP_CONFIGS[strat.map_name.toLowerCase()];
                                 return (
@@ -154,28 +172,30 @@ export const Dashboard = () => {
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, strat.id)}
                                         onClick={() => navigate(`/editor/${strat.id}`)}
-                                        className="bg-[#1e2327] rounded-xl overflow-hidden border border-gray-800 hover:border-[#ff4655] transition-all cursor-pointer group shadow-lg hover:shadow-xl hover:-translate-y-1 relative"
+                                        className="group bg-[#1e2327] rounded-xl overflow-hidden border border-gray-800 hover:border-[#ff4655] transition-all cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-1 flex flex-col"
                                     >
                                         <div className="aspect-video relative overflow-hidden bg-gray-900">
                                             {mapConfig ? (
-                                                <img src={mapConfig.src} alt={strat.map_name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+                                                <img src={mapConfig.src} alt={strat.map_name} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-300 transform group-hover:scale-105" />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-600">Map inconnue</div>
+                                                <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">Map inconnue</div>
                                             )}
-                                            <div className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded text-xs uppercase font-bold text-white backdrop-blur-sm">
+                                            <div className="absolute top-2 left-2 bg-black/70 px-2 py-0.5 rounded text-[10px] uppercase font-bold text-white tracking-widest backdrop-blur-sm border border-white/10">
                                                 {strat.map_name}
                                             </div>
                                         </div>
-                                        <div className="p-4 flex justify-between items-start">
-                                            <div>
-                                                <h3 className="font-bold text-gray-100 truncate pr-2" title={strat.title}>{strat.title}</h3>
-                                                <p className="text-xs text-gray-500 mt-1">Modifié le {new Date(strat.updated_at).toLocaleDateString()}</p>
+                                        <div className="p-4 flex justify-between items-start flex-1">
+                                            <div className="min-w-0">
+                                                <h3 className="font-bold text-gray-100 truncate text-sm mb-1 group-hover:text-[#ff4655] transition-colors">{strat.title || "Sans titre"}</h3>
+                                                <p className="text-[10px] text-gray-500">
+                                                    {new Date(strat.updated_at).toLocaleDateString()}
+                                                </p>
                                             </div>
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); if(confirm('Supprimer cette stratégie ?')) deleteStrategy(strat.id); }}
-                                                className="text-gray-500 hover:text-red-500 p-1 rounded-md hover:bg-gray-800 transition-colors"
+                                                onClick={(e) => { e.stopPropagation(); if(confirm('Supprimer ?')) deleteStrategy(strat.id); }}
+                                                className="text-gray-600 hover:text-red-500 p-1.5 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     </div>
@@ -186,22 +206,22 @@ export const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Modal Nouveau Dossier */}
+            {/* MODAL */}
             {isCreateFolderModalOpen && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] backdrop-blur-sm animate-in fade-in duration-200">
                     <form onSubmit={handleCreateFolder} className="bg-[#1e2327] p-6 rounded-xl border border-gray-700 w-full max-w-sm shadow-2xl">
                         <h3 className="text-lg font-bold text-white mb-4">Nouveau Dossier</h3>
                         <input
                             type="text"
                             autoFocus
                             placeholder="Nom du dossier..."
-                            className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2 text-white mb-6 focus:border-[#ff4655] focus:outline-none"
+                            className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2 text-white mb-6 focus:border-[#ff4655] focus:outline-none focus:ring-1 focus:ring-[#ff4655]"
                             value={newFolderName}
                             onChange={(e) => setNewFolderName(e.target.value)}
                         />
                         <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => setIsCreateFolderModalOpen(false)} className="px-4 py-2 text-gray-400 hover:text-white">Annuler</button>
-                            <button type="submit" className="px-4 py-2 bg-[#ff4655] hover:bg-[#e03e4b] text-white rounded-lg font-medium">Créer</button>
+                            <button type="button" onClick={() => setIsCreateFolderModalOpen(false)} className="px-4 py-2 text-gray-400 hover:text-white transition-colors">Annuler</button>
+                            <button type="submit" className="px-4 py-2 bg-[#ff4655] hover:bg-[#e03e4b] text-white rounded-lg font-bold transition-colors shadow-lg shadow-red-900/20">Créer</button>
                         </div>
                     </form>
                 </div>

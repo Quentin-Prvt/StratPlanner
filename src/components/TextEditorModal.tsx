@@ -129,7 +129,8 @@ export const TextEditorModal = ({
                             fontWeight: isBold ? 'bold' : 'normal',
                             fontStyle: isItalic ? 'italic' : 'normal',
                             color: localColor,
-                            lineHeight: 1.2
+                            lineHeight: 1.2,
+                            whiteSpace: 'pre-wrap'
                         }}
                     />
 

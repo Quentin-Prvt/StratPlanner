@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient.ts';
 import { useAuth } from '../contexts/AuthContext';
 
 export interface Folder {
@@ -13,8 +13,6 @@ export const useSupabaseStrategies = () => {
     const [savedStrategies, setSavedStrategies] = useState<any[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-
-    // RESTORED: These were missing and causing the error in EditorCanvas
     const [showLoadModal, setShowLoadModal] = useState(false);
 
     // --- STRATEGIES ---
@@ -22,13 +20,16 @@ export const useSupabaseStrategies = () => {
     const fetchStrategies = useCallback(async () => {
         if (!user) return;
         setIsLoading(true);
+
         const { data, error } = await supabase
             .from('strategies')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', user.id) // Seulement mes stratégies
             .order('updated_at', { ascending: false });
 
-        if (!error && data) setSavedStrategies(data);
+        if (error) console.error("Erreur fetch strategies:", error);
+        if (data) setSavedStrategies(data);
+
         setIsLoading(false);
     }, [user]);
 
@@ -44,6 +45,7 @@ export const useSupabaseStrategies = () => {
 
     const createNewStrategy = async (mapName: string, title: string) => {
         if (!user) return null;
+
         const { data, error } = await supabase
             .from('strategies')
             .insert([{
@@ -58,7 +60,7 @@ export const useSupabaseStrategies = () => {
             .single();
 
         if (error) {
-            console.error("Erreur création strat:", error); // Ajoute ce log pour mieux voir
+            console.error("Erreur création strat:", error);
             return null;
         }
         return data;
@@ -67,7 +69,7 @@ export const useSupabaseStrategies = () => {
     const updateStrategyData = async (id: string, drawingData: any[]) => {
         const { error } = await supabase
             .from('strategies')
-            .update({ data: drawingData, updated_at: new Date() })
+            .update({ data: drawingData, updated_at: new Date().toISOString() })
             .eq('id', id);
         if (error) console.error("Erreur save:", error);
     };
@@ -89,24 +91,31 @@ export const useSupabaseStrategies = () => {
             .update({ folder_id: folderId })
             .eq('id', strategyId);
 
-        if (!error) fetchStrategies();
+        if (!error) {
+            setSavedStrategies(prev => prev.map(s =>
+                s.id === strategyId ? { ...s, folder_id: folderId } : s
+            ));
+        }
     };
 
     // --- FOLDERS ---
 
     const fetchFolders = useCallback(async () => {
         if (!user) return;
-        const { data } = await supabase
+
+        const { data, error } = await supabase
             .from('folders')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', user.id) // Seulement mes dossiers
             .order('name');
 
+        if (error) console.error("Erreur fetch folders:", error);
         if (data) setFolders(data);
     }, [user]);
 
     const createFolder = async (name: string) => {
         if (!user) return;
+
         const { data } = await supabase
             .from('folders')
             .insert([{ user_id: user.id, name }])
@@ -124,26 +133,18 @@ export const useSupabaseStrategies = () => {
 
         if (!error) {
             setFolders(prev => prev.filter(f => f.id !== id));
-            fetchStrategies();
+            // Mettre à jour les strats orphelines localement
+            setSavedStrategies(prev => prev.map(s =>
+                s.folder_id === id ? { ...s, folder_id: null } : s
+            ));
         }
     };
 
     return {
-        savedStrategies,
-        folders,
-        isLoading,
-        // RESTORED: Returned here so EditorCanvas can access them
-        showLoadModal,
-        setShowLoadModal,
-
-        fetchStrategies,
-        fetchFolders,
-        getStrategyById,
-        createNewStrategy,
-        updateStrategyData,
-        deleteStrategy,
-        createFolder,
-        deleteFolder,
-        moveStrategy
+        savedStrategies, folders, isLoading,
+        showLoadModal, setShowLoadModal,
+        fetchStrategies, fetchFolders, getStrategyById,
+        createNewStrategy, updateStrategyData, deleteStrategy,
+        createFolder, deleteFolder, moveStrategy
     };
 };
