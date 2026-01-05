@@ -23,8 +23,7 @@ export const drawWaylayUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = strokeColor;
+
 
     // Fond
     ctx.fillStyle = mainColor;
