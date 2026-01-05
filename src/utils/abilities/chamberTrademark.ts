@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * Dessine le C de Chamber (Trademark - Piège)
@@ -15,51 +16,56 @@ export const drawChamberTrademark = (
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
-    // Récupération des tailles configurées
     const radius = ABILITY_SIZES['chamber_c_radius'] * mapScale;
     const iconSize = ABILITY_SIZES['chamber_c_icon_size'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('chamber');
+    const zoneColor = hexToRgba(agentHex, 0.2);
+    const strokeColor = agentHex;
+
     ctx.save();
 
-    // 1. Zone de détection (Cercle Jaune/Doré)
+    // 1. Zone de détection
     if (showZones) {
         ctx.beginPath();
         ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-
-        // Couleurs Chamber (Or/Jaune)
-        ctx.fillStyle = 'rgba(234, 179, 8, 0.2)'; // Yellow-500 très transparent
-        ctx.strokeStyle = '#eab308'; // Yellow-500
+        ctx.fillStyle = zoneColor;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]); // Bordure en pointillés pour le style "zone de détection"
+        ctx.setLineDash([5, 5]); // Bordure pointillés
         ctx.fill();
         ctx.stroke();
     }
-    // Remettre le trait plein pour la suite
     ctx.setLineDash([]);
 
     // 2. Icône Centrale
     ctx.translate(center.x, center.y);
 
     if (imageCache) {
-        const imageSrc = 'chamber_c_icon'; // Nom du fichier image
+        const imageSrc = 'chamber_c_icon';
         let img = imageCache.get(imageSrc);
 
         if (!img) {
             img = new Image();
             img.src = `/abilities/${imageSrc}.png`;
             img.onload = triggerRedraw;
-            img.onerror = () => {}; // Gestion silencieuse
+            img.onerror = () => {};
             imageCache.set(imageSrc, img);
         }
 
         if (img.complete && img.naturalWidth > 0) {
             try {
-                // Dessin de l'icône centrée
+                // Petit fond coloré
+                ctx.beginPath();
+                ctx.arc(0, 0, iconSize/2, 0, Math.PI*2);
+                ctx.fillStyle = agentHex;
+                ctx.fill();
+
                 ctx.drawImage(img, -iconSize / 2, -iconSize / 2, iconSize, iconSize);
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
         } else {
-            // Fallback : petit carré jaune
-            ctx.fillStyle = '#eab308';
+            ctx.fillStyle = agentHex;
             ctx.fillRect(-10, -10, 20, 20);
         }
     }
@@ -67,9 +73,7 @@ export const drawChamberTrademark = (
     ctx.restore();
 };
 
-/**
- * Vérifie le clic (dans le cercle)
- */
+// ... check et update inchangés
 export const checkChamberTrademarkHit = (
     pos: { x: number, y: number },
     obj: DrawingObject,
@@ -77,19 +81,12 @@ export const checkChamberTrademarkHit = (
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
     const radius = ABILITY_SIZES['chamber_c_radius'] * mapScale;
-
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
-        return {
-            mode: 'center',
-            offset: { x: pos.x - center.x, y: pos.y - center.y }
-        };
+        return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }
     return null;
 };
 
-/**
- * Mise à jour position
- */
 export const updateChamberTrademarkPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },

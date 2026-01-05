@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * Dessine l'Ultime de Fade (Nightfall)
@@ -9,10 +10,15 @@ export const drawFadeUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, m
     const p1 = obj.points[0]; // Origine
     const p2 = obj.points[1]; // Direction (Handle)
 
-    // Récupération des tailles depuis la config
     const width = ABILITY_SIZES['fade_x_width'] * mapScale;
     const fixedLength = ABILITY_SIZES['fade_x_length'] * mapScale;
-    const gap = 0; // Espace constant avant le début de la zone
+    const gap = 0;
+
+    // --- COULEURS ---
+    const agentHex = getAgentColor('fade'); // Noir/Gris Foncé/Indigo
+    // Pour l'ult, on veut un effet sombre "Nightmare"
+    const zoneColor = hexToRgba(agentHex, 0.6);
+    const strokeColor = '#6366f1'; // On garde l'indigo électrique pour les bords même si agentHex est noir
 
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
@@ -21,39 +27,37 @@ export const drawFadeUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, m
 
     ctx.save();
 
-    // --- ZONE (Rectangle Fixe Indigo) ---
+    // --- ZONE (Rectangle) ---
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
     if (rectLength > 0) {
-        // Fond indigo sombre
-        ctx.fillStyle = 'rgba(49, 46, 129, 0.6)';
+        ctx.fillStyle = zoneColor;
         ctx.fillRect(gap, -width / 2, rectLength, width);
 
-        // Bordure Indigo brillante
-        ctx.strokeStyle = '#6366f1';
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 3;
         ctx.strokeRect(gap, -width / 2, rectLength, width);
     }
     ctx.restore();
 
     // --- CONTROLES ---
-    // A. Origine (Rond Blanc)
+    // A. Origine
     ctx.save();
     ctx.beginPath();
     ctx.fillStyle = 'white';
-    ctx.strokeStyle = '#6366f1';
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2;
     ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
 
-    // B. Handle (Losange Indigo)
+    // B. Handle
     ctx.save();
     ctx.translate(p2.x, p2.y);
     ctx.rotate(angle + Math.PI / 4);
-    ctx.fillStyle = '#6366f1';
+    ctx.fillStyle = strokeColor;
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     const diamondSize = 10;
@@ -64,13 +68,10 @@ export const drawFadeUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, m
     ctx.restore();
 };
 
-/**
- * Vérifie le clic
- */
+// ... check et update inchangés
 export const checkFadeUltHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'handle' };
     if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 15) {
         return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
@@ -78,9 +79,6 @@ export const checkFadeUltHit = (pos: { x: number, y: number }, obj: DrawingObjec
     return null;
 };
 
-/**
- * Mise à jour de la position (Distance fixe)
- */
 export const updateFadeUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -90,7 +88,6 @@ export const updateFadeUltPosition = (
 ): DrawingObject => {
     const p1 = obj.points[0];
     const fixedLength = ABILITY_SIZES['fade_x_length'] * mapScale;
-
     if (mode === 'handle') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -99,7 +96,6 @@ export const updateFadeUltPosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
-
     if (mode === 'center') {
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;

@@ -1,8 +1,9 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor } from '../agentColors';
 
 /**
- * Calcul distance point-segment (inchangé)
+ * Calcul distance point-segment
  */
 const distToSegment = (p: {x: number, y: number}, v: {x: number, y: number}, w: {x: number, y: number}) => {
     const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
@@ -17,9 +18,16 @@ const distToSegment = (p: {x: number, y: number}, v: {x: number, y: number}, w: 
  */
 export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
-    const p1 = obj.points[0]; // L'Ancre (Fixe relative)
-    const p2 = obj.points[1]; // La Poignée (Mobile)
+    const p1 = obj.points[0];
+    const p2 = obj.points[1];
     const boxSize = ABILITY_SIZES['cypher_c_box_size'] * mapScale;
+
+    // --- COULEURS ---
+    const agentHex = getAgentColor('cypher');
+    // Encore une fois, Cypher est souvent associé au Cyan tech (#22d3ee)
+    // Si agentColors donne du gris, on peut utiliser le gris, ou forcer du cyan si tu préfères.
+    // Ici j'utilise agentHex pour la cohérence.
+    const techColor = agentHex;
 
     ctx.save();
 
@@ -27,33 +35,31 @@ export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = '#22d3ee'; // Cyan
+    ctx.strokeStyle = techColor;
     ctx.lineWidth = 2;
-    ctx.shadowColor = '#22d3ee';
+    ctx.shadowColor = techColor;
     ctx.shadowBlur = 8;
     ctx.stroke();
 
-    ctx.shadowBlur = 0; // Reset glow
+    ctx.shadowBlur = 0;
 
-    // --- B. L'Ancre (Point 1 - Petit disque) ---
+    // --- B. L'Ancre (Point 1) ---
     ctx.beginPath();
     ctx.arc(p1.x, p1.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#0e7490';
+    ctx.fillStyle = techColor; // Plein
     ctx.fill();
-    ctx.strokeStyle = '#22d3ee';
     ctx.stroke();
 
-    // --- C. La Poignée (Point 2 - Carré) ---
-    // C'est le seul coté qu'on dessine en "carré interactif"
+    // --- C. La Poignée (Point 2) ---
     ctx.beginPath();
     ctx.rect(p2.x - boxSize / 2, p2.y - boxSize / 2, boxSize, boxSize);
-    ctx.fillStyle = '#0e7490';
+    ctx.fillStyle = techColor; // Plein
     ctx.fill();
-    ctx.strokeStyle = '#67e8f9';
+    ctx.strokeStyle = '#ffffff'; // Contour blanc pour le contraste
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Petit point central dans le carré
+    // Petit point central
     ctx.beginPath();
     ctx.arc(p2.x, p2.y, 2, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
@@ -62,9 +68,7 @@ export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     ctx.restore();
 };
 
-/**
- * 2. HIT TEST : On ne peut attraper que P2 (Handle) ou le Corps
- */
+// ... check et update inchangés
 export const checkCypherTrapwireHit = (
     pos: { x: number, y: number },
     obj: DrawingObject
@@ -72,25 +76,16 @@ export const checkCypherTrapwireHit = (
     const p1 = obj.points[0];
     const p2 = obj.points[1];
     const handleRadius = 15;
-
-    // On vérifie SEULEMENT le point 2 (la poignée)
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < handleRadius) {
         return { mode: 'handle' };
     }
-
-    // Clic sur le corps ?
     const dist = distToSegment(pos, p1, p2);
     if (dist < 10) {
-        // Offset par rapport à P1 pour le déplacement global
         return { mode: 'body', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
     }
-
     return null;
 };
 
-/**
- * 3. UPDATE : Gestion de la contrainte de longueur max
- */
 export const updateCypherTrapwirePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -103,38 +98,19 @@ export const updateCypherTrapwirePosition = (
     const maxLength = ABILITY_SIZES['cypher_c_max_length'] * mapScale;
 
     if (mode === 'handle') {
-        // On déplace P2, mais on le contraint à la longueur max par rapport à P1
         let dx = pos.x - p1.x;
         let dy = pos.y - p1.y;
-
-        // Calcul de la distance actuelle
         const currentLength = Math.hypot(dx, dy);
-
-        // Si on dépasse la longueur max, on bloque
         if (currentLength > maxLength) {
             const ratio = maxLength / currentLength;
             dx *= ratio;
             dy *= ratio;
         }
-
-        return {
-            ...obj,
-            points: [p1, { x: p1.x + dx, y: p1.y + dy }]
-        };
+        return { ...obj, points: [p1, { x: p1.x + dx, y: p1.y + dy }] };
     } else {
-        // 'body' : On déplace tout l'objet via P1 (l'ancre)
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
-
-        // On recalcule P2 pour qu'il suive P1 en gardant le même vecteur relatif
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
-
-        return {
-            ...obj,
-            points: [
-                newP1,
-                { x: newP1.x + dx, y: newP1.y + dy }
-            ]
-        };
+        return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
     }
 };

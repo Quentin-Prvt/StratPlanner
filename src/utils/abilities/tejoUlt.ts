@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * DESSIN : Tejo X (Rectangle Directionnel)
@@ -17,18 +18,22 @@ export const drawTejoUlt = (
     const length = ABILITY_SIZES['tejo_x_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('tejo'); // Teal (#2dd4bf)
+    // Tejo a souvent un thème militaire/vert, mais on suit la config
+    const mainColor = agentHex;
+    const accentColor = hexToRgba(agentHex, 0.5);
+    const zoneColor = hexToRgba(agentHex, 0.2);
+
     ctx.save();
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
-
-    const mainColor = '#ca9625';
-    const accentColor = '#f6e4b9';
 
     ctx.shadowBlur = 10;
     ctx.shadowColor = mainColor;
 
     // Fond
-    ctx.fillStyle = 'rgba(253,187,46,0.2)'; // Fond semi-transparent
+    ctx.fillStyle = zoneColor;
     ctx.fillRect(0, -width / 2, length, width);
 
     // Bordure
@@ -55,29 +60,20 @@ export const drawTejoUlt = (
     ctx.stroke();
 };
 
-/**
- * HIT TEST
- */
+// ... check et update inchangés
 export const checkTejoUltHit = (
     pos: { x: number, y: number },
     obj: DrawingObject,
 ) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-
-    // Clic Rotation (P2)
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'rotate' };
-
-    // Clic Centre (P1)
     if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 20) {
         return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
     }
     return null;
 };
 
-/**
- * UPDATE POSITION
- */
 export const updateTejoUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -87,7 +83,6 @@ export const updateTejoUltPosition = (
 ) => {
     const p1 = obj.points[0];
     const length = ABILITY_SIZES['tejo_x_length'] * mapScale;
-
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -96,7 +91,6 @@ export const updateTejoUltPosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
-
     if (mode === 'center') {
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;
@@ -104,6 +98,5 @@ export const updateTejoUltPosition = (
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
         return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
     }
-
     return obj;
 };

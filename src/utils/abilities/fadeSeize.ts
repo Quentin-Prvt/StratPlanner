@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors'; // <-- Import
 
 export const drawFadeSeize = (
     ctx: CanvasRenderingContext2D,
@@ -12,9 +13,13 @@ export const drawFadeSeize = (
     if (obj.points.length < 1) return;
     const center = obj.points[0];
 
-    // --- UTILISATION DES TAILLES DYNAMIQUES ---
     const radius = ABILITY_SIZES['fade_q_radius'] * mapScale;
     const iconSize = ABILITY_SIZES['fade_q_icon_size'] * mapScale;
+
+    // --- COULEURS ---
+    const agentHex = getAgentColor('fade');
+    const zoneColor = hexToRgba(agentHex, 0.25);
+    const strokeColor = '#6366f1'; // Indigo électrique
 
     ctx.save();
 
@@ -22,13 +27,12 @@ export const drawFadeSeize = (
     if (showZones) {
         ctx.beginPath();
         ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(79, 70, 229, 0.25)';
-        ctx.strokeStyle = '#6366f1';
+        ctx.fillStyle = zoneColor;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 3;
         ctx.fill();
         ctx.stroke();
     }
-
 
     // 2. Icône Centrale
     if (imageCache) {
@@ -43,6 +47,12 @@ export const drawFadeSeize = (
         }
 
         if (img.complete && img.naturalWidth > 0) {
+            // Fond coloré sous l'icône
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, iconSize/2, 0, Math.PI*2);
+            ctx.fillStyle = agentHex; // Fond sombre Fade
+            ctx.fill();
+
             ctx.drawImage(
                 img,
                 center.x - iconSize / 2,
@@ -51,9 +61,8 @@ export const drawFadeSeize = (
                 iconSize
             );
         } else {
-            // Fallback
             ctx.beginPath();
-            ctx.fillStyle = '#6366f1';
+            ctx.fillStyle = strokeColor;
             ctx.arc(center.x, center.y, 8, 0, Math.PI * 2);
             ctx.fill();
         }
@@ -62,6 +71,7 @@ export const drawFadeSeize = (
     ctx.restore();
 };
 
+// ... check et update inchangés
 export const checkFadeSeizeHit = (
     pos: { x: number, y: number },
     obj: DrawingObject

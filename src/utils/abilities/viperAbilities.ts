@@ -19,14 +19,13 @@ export const drawViperWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     // Style Viper : Vert Toxique
     const viperGreen = '#65a30d'; // Lime-600
 
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = viperGreen;
+
 
     // 1. La ligne principale (le gaz)
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(length, 0);
-    ctx.strokeStyle = 'rgba(101, 163, 13, 0.6)'; // Vert semi-transparent
+    ctx.strokeStyle = 'rgba(133,220,14,0.6)'; // Vert semi-transparent
     ctx.lineWidth = 6;
     ctx.stroke();
 
@@ -41,7 +40,7 @@ export const drawViperWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
 
     // P2 (Handle Direction)
     ctx.beginPath();
-    ctx.arc(p2.x, p2.y, 6, 0, Math.PI * 2);
+    ctx.arc(p2.x , p2.y , 6, 0, Math.PI * 2);
     ctx.fillStyle = 'white';
     ctx.strokeStyle = viperGreen;
     ctx.lineWidth = 2;

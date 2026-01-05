@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * 1. DESSIN : La Cyber Cage
@@ -13,42 +14,40 @@ export const drawCypherCage = (
     const center = obj.points[0];
     const radius = ABILITY_SIZES['cypher_q_radius'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('cypher'); // Gris/Blanc/Cyan (selon ta config, ici peut-être un Cyan custom ?)
+    // Pour Cypher, on veut souvent du Cyan "Tech" plutôt que juste Gris
+    // Mais si tu as mis '#9ca3af' dans agentColors, ça fera gris.
+    // Tu peux surcharger ici si tu veux garder le look "Cyan" spécifique à Cypher ingame.
+    // const techColor = '#22d3ee'; // Cyan
+    const techColor = agentHex; // Ou utiliser la couleur config
+
     ctx.save();
 
     // --- Cercle principal ---
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
 
-    // Style : Cyan transparent avec une bordure brillante
-    ctx.fillStyle = 'rgba(34, 211, 238, 0.2)'; // Cyan-400 très transparent
-    ctx.strokeStyle = '#22d3ee'; // Cyan-400
+    ctx.fillStyle = hexToRgba(techColor, 0.2);
+    ctx.strokeStyle = techColor;
     ctx.lineWidth = 2;
-
-    // Effet de "glow" technologique
-    ctx.shadowColor = '#22d3ee';
-
+    ctx.shadowColor = techColor; // Glow
 
     ctx.fill();
     ctx.stroke();
 
-    // --- Centre (le dispositif au sol) ---
-    ctx.shadowBlur = 0; // Reset du glow pour le centre
-    ctx.setLineDash([]); // Reset des pointillés
-
+    // --- Centre ---
+    ctx.shadowBlur = 0;
     ctx.beginPath();
-    ctx.arc(center.x, center.y, 1, 0, Math.PI * 2);
-    ctx.fillStyle = '#0e7490'; // Cyan foncé
+    ctx.arc(center.x, center.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = techColor; // Centre plein
     ctx.fill();
-    ctx.strokeStyle = '#22d3ee';
-    ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.restore();
 };
 
-/**
- * 2. HIT TEST : Clic dans le cercle
- */
+// ... check et update inchangés
 export const checkCypherCageHit = (
     pos: { x: number, y: number },
     obj: DrawingObject,
@@ -56,19 +55,12 @@ export const checkCypherCageHit = (
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
     const radius = ABILITY_SIZES['cypher_q_radius'] * mapScale;
-
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
-        return {
-            mode: 'center',
-            offset: { x: pos.x - center.x, y: pos.y - center.y }
-        };
+        return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }
     return null;
 };
 
-/**
- * 3. UPDATE : Déplacement simple
- */
 export const updateCypherCagePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },

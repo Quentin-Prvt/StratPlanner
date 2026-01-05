@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * DESSIN : E - Recon Bolt (Cercle avec Icône)
@@ -18,14 +19,19 @@ export const drawSovaBolt = (
     const radius = ABILITY_SIZES['sova_e_radius'] * mapScale;
     const iconSize = ABILITY_SIZES['sova_e_icon_size'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('sova'); // Bleu Chasseur (#3b82f6)
+    const zoneColor = hexToRgba(agentHex, 0.2);
+    const strokeColor = agentHex;
+
     ctx.save();
 
-    // 1. Zone de détection (Bleu électrique transparent)
+    // 1. Zone de détection
     if (showZones) {
         ctx.beginPath();
         ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.2)'; // Blue-500 transparent
-        ctx.strokeStyle = '#3b82f6'; // Blue-500
+        ctx.fillStyle = zoneColor;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
         ctx.fill();
         ctx.stroke();
@@ -40,6 +46,12 @@ export const drawSovaBolt = (
             imageCache.set(obj.imageSrc, img);
         }
         if (img.complete && img.naturalWidth > 0) {
+            // Fond coloré
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, iconSize/2, 0, Math.PI*2);
+            ctx.fillStyle = agentHex;
+            ctx.fill();
+
             ctx.drawImage(img, center.x - iconSize/2, center.y - iconSize/2, iconSize, iconSize);
         }
     }
@@ -58,23 +70,26 @@ export const drawSovaUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, m
     const length = ABILITY_SIZES['sova_x_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('sova');
+    const zoneColor = hexToRgba(agentHex, 0.5);
+    const strokeColor = '#93c5fd'; // Bleu clair
+
     ctx.save();
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
-    // Style Sova : Bleu intense et Tech
     ctx.shadowBlur = 10;
-    ctx.shadowColor = '#60a5fa'; // Blue glow
+    ctx.shadowColor = agentHex;
 
     // Fond
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.5)'; // Blue-600
+    ctx.fillStyle = zoneColor;
     ctx.fillRect(0, -width / 2, length, width);
 
     // Bordures
-    ctx.strokeStyle = '#93c5fd'; // Blue-300
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2;
     ctx.strokeRect(0, -width / 2, length, width);
-
 
     ctx.restore();
 
@@ -82,24 +97,21 @@ export const drawSovaUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject, m
     // P1 (Centre)
     ctx.beginPath();
     ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#2563eb';
+    ctx.fillStyle = agentHex;
     ctx.fill();
 
-    // P2 (Handle Direction)
+    // P2 (Handle)
     ctx.beginPath();
     ctx.arc(p2.x, p2.y, 6, 0, Math.PI * 2);
     ctx.fillStyle = 'white';
-    ctx.strokeStyle = '#2563eb';
+    ctx.strokeStyle = agentHex;
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
 };
 
-/**
- * HIT TEST
- */
+// ... check et update inchangés
 export const checkSovaHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
-    // E (Recon) : Hitbox Icône uniquement (click through)
     if (obj.tool === 'sova_e_bolt') {
         const center = obj.points[0];
         if (Math.hypot(pos.x - center.x, pos.y - center.y) < 30) {
@@ -107,14 +119,10 @@ export const checkSovaHit = (pos: { x: number, y: number }, obj: DrawingObject) 
         }
         return null;
     }
-
-    // X (Ult) : Handle ou Centre
     if (obj.tool === 'sova_x_blast') {
         const p1 = obj.points[0];
         const p2 = obj.points[1];
-        // Clic Rotation (P2)
         if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'rotate' };
-        // Clic Centre (P1)
         if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 20) {
             return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
         }
@@ -122,9 +130,6 @@ export const checkSovaHit = (pos: { x: number, y: number }, obj: DrawingObject) 
     return null;
 };
 
-/**
- * UPDATE POSITION
- */
 export const updateSovaPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -133,15 +138,10 @@ export const updateSovaPosition = (
     mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
-
-    // E (Recon)
     if (obj.tool === 'sova_e_bolt') {
         return { ...obj, points: [{ x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }] };
     }
-
-    // X (Ult)
     const length = ABILITY_SIZES['sova_x_length'] * mapScale;
-
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -150,7 +150,6 @@ export const updateSovaPosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
-
     if (mode === 'center') {
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;
@@ -158,6 +157,5 @@ export const updateSovaPosition = (
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
         return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
     }
-
     return obj;
 };

@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * Dessine l'Ultime de Brimstone (Orbital Strike - X)
@@ -11,23 +12,27 @@ export const drawBrimstoneUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObje
     // Récupération du rayon configuré
     const radius = ABILITY_SIZES['brimstone_x_radius'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('brimstone'); // Orange
+    // Pour l'ultime, on veut un effet "laser" intense
+    // On garde le dégradé mais en utilisant la couleur dynamique
+
     ctx.save();
 
     // 1. Zone d'effet principale
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
 
-    // Style : Orange/Rouge intense, type "laser orbital"
-    // Remplissage dégradé radial pour un effet plus "chaud" au centre
+    // Remplissage dégradé radial
     const gradient = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radius);
-    gradient.addColorStop(0, 'rgba(255, 100, 0, 0.6)'); // Centre orange vif
-    gradient.addColorStop(1, 'rgba(255, 69, 0, 0.3)');  // Bords rouge-orange plus transparent
+    gradient.addColorStop(0, hexToRgba(agentHex, 0.6)); // Centre vif
+    gradient.addColorStop(1, hexToRgba(agentHex, 0.3));  // Bords plus transparents
 
     ctx.fillStyle = gradient;
     ctx.fill();
 
     // Bordure marquée
-    ctx.strokeStyle = '#ff4500'; // OrangeRed
+    ctx.strokeStyle = agentHex;
     ctx.lineWidth = 3;
     ctx.stroke();
 
@@ -47,9 +52,7 @@ export const drawBrimstoneUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObje
     ctx.restore();
 };
 
-/**
- * Vérifie le clic : on peut cliquer n'importe où dans le cercle
- */
+// ... check et update inchangés
 export const checkBrimstoneUltHit = (
     pos: { x: number, y: number },
     obj: DrawingObject,
@@ -57,20 +60,12 @@ export const checkBrimstoneUltHit = (
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
     const radius = ABILITY_SIZES['brimstone_x_radius'] * mapScale;
-
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
-        return {
-            mode: 'center',
-            offset: { x: pos.x - center.x, y: pos.y - center.y }
-        };
+        return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }
-
     return null;
 };
 
-/**
- * Mise à jour position : translation simple
- */
 export const updateBrimstoneUltPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },

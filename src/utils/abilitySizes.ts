@@ -18,11 +18,11 @@ export const ABILITY_SIZES: Record<string, number> = {
     'astra_c': 70, 'astra_q': 55, 'astra_e': 60,
 
     // BRIMSTONE
-    'brimstone_c_radius': 35,
+    'brimstone_c_radius': 50,
     'brimstone_c_icon_size': 20,
     'brimstone_e': 65,
     'brimstone_q': 65,
-    'brimstone_x_radius': 42,
+    'brimstone_x_radius': 65,
 
     // CHAMBER
     'chamber_q': 20, 'chamber_x': 20,
@@ -34,7 +34,7 @@ export const ABILITY_SIZES: Record<string, number> = {
 
     // CYPHER
     'cypher_c_max_length': 94, 'cypher_c_box_size': 8,
-    'cypher_q_radius': 18, 'cypher_e': 20, 'cypher_x': 20,
+    'cypher_q_radius': 25, 'cypher_e': 20, 'cypher_x': 20,
 
     // DEADLOCK
     'deadlock_e': 150, 'deadlock_c_radius': 60, 'deadlock_c_node_size': 10, 'deadlock_c_max_length':60,
@@ -43,8 +43,8 @@ export const ABILITY_SIZES: Record<string, number> = {
 
     // FADE
     'fade_c': 30, 'fade_x_width': 110, 'fade_x_length': 200,
-    'fade_q_radius': 30, 'fade_q_icon_size': 20,
-    'fade_e_radius': 140, 'fade_e_icon_size': 20,
+    'fade_q_radius': 50, 'fade_q_icon_size': 20,
+    'fade_e_radius': 215, 'fade_e_icon_size': 20,
 
     // GEKKO
     'gekko_c': 75, 'gekko_e': 20, 'gekko_x': 20,
@@ -57,39 +57,40 @@ export const ABILITY_SIZES: Record<string, number> = {
 
     // ISO
     'iso_q_width': 30, 'iso_q_length': 175,
-    'iso_e': 30, 'iso_x_width': 70, 'iso_x_length': 185,
+    'iso_e': 20, 'iso_x_width': 70, 'iso_x_length': 185,
 
     // JETT
-    'jett_c': 100, 'jett_q': 30, 'jett_e': 30, 'jett_x': 30,
+    'jett_c': 45, 'jett_q': 20, 'jett_e': 20, 'jett_x': 20,
 
     // KAYO
-    'kayo_c': 120, 'kayo_q': 30,
-    'kayo_e_radius': 200, 'kayo_e_icon_size': 30,
-    'kayo_x_radius': 480, 'kayo_x_icon_size': 30,
+    'kayo_c': 60, 'kayo_q': 30,
+    'kayo_e_radius': 120, 'kayo_e_icon_size': 20,
+    'kayo_x_radius': 320, 'kayo_x_icon_size': 20,
 
     // KILLJOY
-    'killjoy_c': 110, 'killjoy_q_radius': 70, 'killjoy_q_icon_size': 30,
-    'killjoy_e_size': 30, 'killjoy_e_handle_dist': 50,
-    'killjoy_x_radius': 245, 'killjoy_x_icon_size': 30,
+    'killjoy_c_radius': 35,
+    'killjoy_q_radius': 40, 'killjoy_q_icon_size': 30, 'killjoy_q_detection_radius': 300,
+    'killjoy_e_size': 50, 'killjoy_e_handle_dist': 40, 'killjoy_e_range': 300,
+    'killjoy_x_radius': 243, 'killjoy_x_icon_size': 30,
 
     // NEON
-    'neon_c_width': 40, 'neon_c_length': 290,
-    'neon_q_radius': 70, 'neon_q_icon_size': 30,
-    'neon_e': 50, 'neon_x': 60,
+    'neon_c_width': 20, 'neon_c_length': 170,
+    'neon_q_radius': 40, 'neon_q_icon_size': 30,
+    'neon_e': 30, 'neon_x': 30,
 
     // OMEN
-    'omen_e': 160, 'omen_q_width': 105, 'omen_q_length': 325,
+    'omen_e': 100, 'omen_q_width': 70, 'omen_q_length': 210,
     'omen_c': 30, 'omen_x': 30,
 
     // PHOENIX
-    'phoenix_c': 30, 'phoenix_q': 110, 'phoenix_e': 30, 'phoenix_x': 30,
+    'phoenix_c': 30, 'phoenix_q': 75, 'phoenix_e': 30, 'phoenix_x': 30,
 
     // RAZE
     'raze_q':30, 'raze_e':30, 'raze_x':30,
     'raze_c_size': 100, 'raze_c_handle_dist': 30,
 
     // REYNA
-    'reyna_q':30, 'reyna_e':30, 'reyna_x':30,
+    'reyna_c':40, 'reyna_q':30, 'reyna_e':30, 'reyna_x':30,
 
     // SAGE
     'sage_e':30, 'sage_x':30, 'sage_c_size': 110, 'sage_c_handle_dist': 70,
@@ -98,32 +99,32 @@ export const ABILITY_SIZES: Record<string, number> = {
     'skye_c': 30, 'skye_q': 30, 'skye_e': 30, 'skye_x':30,
 
     // SOVA
-    'sova_c': 30, 'sova_q': 100,
-    'sova_e_radius': 333, 'sova_e_icon_size': 30,
-    'sova_x_width': 65, 'sova_x_length': 1000,
+    'sova_c': 30, 'sova_q': 70,
+    'sova_e_radius': 215, 'sova_e_icon_size': 30,
+    'sova_x_width': 40, 'sova_x_length': 520,
 
     // TEJO
-    'tejo_c':30, 'tejo_q':130, 'tejo_e':130,
-    'tejo_x_width': 150, 'tejo_x_length': 370,
+    'tejo_c':30, 'tejo_q':80, 'tejo_e':85,
+    'tejo_x_width': 95, 'tejo_x_length': 240,
 
     // VETO
-    'veto_c_radius': 260, 'veto_c_icon_size': 30,
-    'veto_q_radius': 65, 'veto_q_icon_size': 30,
-    'veto_e_radius': 210, 'veto_e_icon_size': 30,
+    'veto_c_radius': 175, 'veto_c_icon_size': 30,
+    'veto_q_radius': 45, 'veto_q_icon_size': 30,
+    'veto_e_radius': 135, 'veto_e_icon_size': 30,
     'veto_x': 30,
 
     // VIPER
-    'viper_c': 130, 'viper_q': 130, 'viper_x': 160,
+    'viper_c': 80, 'viper_q': 80, 'viper_x': 160,
     'viper_e_length': 750, 'viper_e_width': 10,
 
     // VYSE
-    'vyse_c':130, 'vyse_e':30,
-    'vyse_q_width': 10, 'vyse_q_length': 150,
-    'vyse_x_radius': 300, 'vyse_x_icon_size': 30,
+    'vyse_c':80, 'vyse_e':30,
+    'vyse_q_width': 5, 'vyse_q_length': 80,
+    'vyse_x_radius': 190, 'vyse_x_icon_size': 30,
 
     // WAYLAY
-    'waylay_c': 130, 'waylay_q': 30, 'waylay_e': 30,
-    'waylay_x_width': 160, 'waylay_x_length': 450,
+    'waylay_c': 90, 'waylay_q': 30, 'waylay_e': 30,
+    'waylay_x_width': 105, 'waylay_x_length': 295,
 
     // YORU
     'yoru_c': 30, 'yoru_q':30, 'yoru_e': 30, 'yoru_x': 30,

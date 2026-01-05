@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * 1. DESSIN : Capteur + Zone rectangulaire orientée
@@ -9,12 +10,14 @@ export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     const center = obj.points[0];
     const handle = obj.points[1];
 
-    // Récupération des config
     const length = ABILITY_SIZES['deadlock_q_length'] * mapScale;
     const width = ABILITY_SIZES['deadlock_q_width'] * mapScale;
-
-    // MODIFICATION : On réduit la taille du carré (x0.6) pour qu'il soit plus discret
     const iconSize = (ABILITY_SIZES['deadlock_q_icon_size'] * 0.5) * mapScale;
+
+    // --- COULEURS ---
+    const agentHex = getAgentColor('deadlock'); // Bleu Tech (#38bdf8)
+    const zoneColor = hexToRgba(agentHex, 0.15);
+    const strokeColor = agentHex;
 
     // Calcul de l'angle de rotation
     const dx = handle.x - center.x;
@@ -27,49 +30,44 @@ export const drawDeadlockSensor = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     ctx.translate(center.x, center.y);
     ctx.rotate(angle);
 
-    // A. Zone de détection (Rectangle devant le capteur)
+    // A. Zone de détection
     ctx.beginPath();
-    // On dessine un rectangle qui part de 0 (le capteur) vers la longueur
     ctx.rect(0, -width / 2, length, width);
 
-    // Style "Sound wave" (Cyan/Gris transparent)
-    ctx.fillStyle = 'rgba(200, 230, 255, 0.15)';
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.5)'; // Cyan
+    // Style "Sound wave"
+    ctx.fillStyle = zoneColor;
+    ctx.strokeStyle = hexToRgba(agentHex, 0.5);
     ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]); // Pointillés pour effet "sonore"
+    ctx.setLineDash([4, 4]); // Pointillés
     ctx.fill();
     ctx.stroke();
 
     // Reset du style pour les éléments solides
     ctx.setLineDash([]);
-    ctx.shadowColor = '#22d3ee';
-
+    ctx.shadowColor = agentHex;
+    ctx.shadowBlur = 5;
 
     // B. Le Capteur (Icone/Carré au centre)
-    // Note: on est toujours dans le repère rotaté
     ctx.beginPath();
     ctx.rect(- iconSize / 2, -iconSize / 2, iconSize, iconSize);
-    ctx.fillStyle = '#0e7490'; // Cyan foncé
+    ctx.fillStyle = agentHex; // Bleu plein
     ctx.fill();
-    ctx.strokeStyle = '#22d3ee';
+    ctx.strokeStyle = '#ffffff'; // Blanc
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // C. La Poignée de rotation (au bout, pour visualiser la direction)
-    // On la dessine à la distance "length" sur l'axe X (car on a rotaté)
+    // C. La Poignée de rotation
     ctx.beginPath();
-    ctx.arc(length, 0, 5, 0, Math.PI * 2); // J'ai aussi réduit un peu la poignée (6 -> 5)
+    ctx.arc(length, 0, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
-    ctx.strokeStyle = '#22d3ee';
+    ctx.strokeStyle = strokeColor;
     ctx.stroke();
 
     ctx.restore();
 };
 
-/**
- * 2. HIT TEST : Centre ou Poignée
- */
+// ... check et update inchangés
 export const checkDeadlockSensorHit = (
     pos: { x: number, y: number },
     obj: DrawingObject
@@ -77,23 +75,15 @@ export const checkDeadlockSensorHit = (
     const center = obj.points[0];
     const handle = obj.points[1];
     const hitRadius = 20;
-
-    // 1. Clic Centre
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < hitRadius) {
         return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }
-
-    // 2. Clic Poignée (On recalcule sa position réelle si besoin, mais ici obj.points[1] est la position réelle)
     if (Math.hypot(pos.x - handle.x, pos.y - handle.y) < hitRadius) {
         return { mode: 'rotate' };
     }
-
     return null;
 };
 
-/**
- * 3. UPDATE : Mouvement et Rotation
- */
 export const updateDeadlockSensorPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -104,26 +94,19 @@ export const updateDeadlockSensorPosition = (
     const center = obj.points[0];
     const handle = obj.points[1];
     const length = ABILITY_SIZES['deadlock_q_length'] * mapScale;
-
     if (mode === 'center') {
-        // Déplacement global
         const newCenter = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
         const dx = handle.x - center.x;
         const dy = handle.y - center.y;
-
         return { ...obj, points: [newCenter, { x: newCenter.x + dx, y: newCenter.y + dy }] };
     } else {
-        // Rotation (on met à jour la poignée)
-        // Pour garder la taille fixe définie dans la config, on normalise le vecteur
         const dx = pos.x - center.x;
         const dy = pos.y - center.y;
         const angle = Math.atan2(dy, dx);
-
         const newHandle = {
             x: center.x + Math.cos(angle) * length,
             y: center.y + Math.sin(angle) * length
         };
-
         return { ...obj, points: [center, newHandle] };
     }
 };

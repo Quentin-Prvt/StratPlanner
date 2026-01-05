@@ -1,12 +1,12 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors'; // <-- Import
 
 const BEACON_IMAGE_SIZE = 20;
 
 export const drawBrimstoneStim = (
     ctx: CanvasRenderingContext2D,
     obj: DrawingObject,
-    // On met un type explicite et une valeur par défaut pour éviter le crash si oublié
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
     showZones: boolean,
@@ -16,14 +16,19 @@ export const drawBrimstoneStim = (
     const center = obj.points[0];
     const radius = ABILITY_SIZES['brimstone_c_radius'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('brimstone'); // Orange
+    const zoneColor = hexToRgba(agentHex, 0.3);
+    const strokeColor = agentHex;
+
     ctx.save();
 
     // 1. Zone d'effet
     if (showZones) {
         ctx.beginPath();
         ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(251, 146, 60, 0.3)';
-        ctx.strokeStyle = '#f97316';
+        ctx.fillStyle = zoneColor;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
         ctx.fill();
         ctx.stroke();
@@ -37,23 +42,26 @@ export const drawBrimstoneStim = (
     // 2. Logo Central
     ctx.translate(center.x, center.y);
 
-    // Sécurité : si imageCache n'est pas passé, on ne fait rien pour l'image
     if (imageCache) {
         const imageSrc = 'brimstone_c_icon';
         let img = imageCache.get(imageSrc);
 
         if (!img) {
             img = new Image();
-            img.src = `/abilities/${imageSrc}.png`; // Assure-toi que ce fichier existe !
+            img.src = `/abilities/${imageSrc}.png`;
             img.onload = triggerRedraw;
-            // Gestion d'erreur silencieuse pour éviter le crash "broken state"
             img.onerror = () => { console.warn(`Image introuvable: `); };
             imageCache.set(imageSrc, img);
         }
 
-        // Cela garantit que l'image est bien chargée et valide avant le drawImage
         if (img.complete && img.naturalWidth > 0) {
             try {
+                // Petit cercle de fond pour l'icone
+                ctx.beginPath();
+                ctx.arc(0, 0, BEACON_IMAGE_SIZE/1.5, 0, Math.PI*2);
+                ctx.fillStyle = agentHex;
+                ctx.fill();
+
                 ctx.drawImage(
                     img,
                     -BEACON_IMAGE_SIZE / 2,
@@ -61,13 +69,10 @@ export const drawBrimstoneStim = (
                     BEACON_IMAGE_SIZE,
                     BEACON_IMAGE_SIZE
                 );
-            } catch (e) {
-                // Ignore l'erreur de dessin si l'image est capricieuse
-            }
+            } catch (e) {}
         } else {
-            // Fallback : Si l'image n'est pas là, on dessine un petit cercle témoin
             ctx.beginPath();
-            ctx.fillStyle = '#f97316';
+            ctx.fillStyle = strokeColor;
             ctx.arc(0, 0, 10, 0, Math.PI*2);
             ctx.fill();
         }
@@ -76,13 +81,13 @@ export const drawBrimstoneStim = (
     ctx.restore();
 };
 
+// ... check et update inchangés
 export const checkBrimstoneStimHit = (
     pos: { x: number, y: number },
     obj: DrawingObject
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const HITBOX_RADIUS = 25; // Zone cliquable autour du centre
-
+    const HITBOX_RADIUS = 25;
     if (Math.hypot(pos.x - center.x, pos.y - center.y) < HITBOX_RADIUS) {
         return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }

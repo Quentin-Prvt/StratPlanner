@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../types/canvas';
 import { drawSmoothLine, drawArrowHead } from './canvasDrawing';
+import { getAgentColor, hexToRgba } from './agentColors';
 
 // Imports des Abilités Vectorielles
 import { drawBreachStun } from './abilities/breachStun';
@@ -104,8 +105,14 @@ export const renderDrawings = (
         if (obj.tool === 'harbor_x_zone') {drawHarborUlt(ctx, obj, mapScale); return; }
         if (['iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); return; }
         if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { drawKayoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') { drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'killjoy_e_turret') { drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
+        if (obj.tool === 'killjoy_c_zone' || obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') {
+            drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale);
+            return;
+        }
+        if (obj.tool === 'killjoy_e_turret') {
+            drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, mapScale, showZones);
+            return;
+        }
         if (obj.tool === 'neon_c_wall') { drawNeonWall(ctx, obj, mapScale); return; }
         if (obj.tool === 'neon_q_zone') { drawNeonStun(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
         if (obj.tool === 'omen_q_zone') { drawOmenParanoia(ctx, obj, mapScale); return; }
@@ -135,14 +142,15 @@ export const renderDrawings = (
 
             if (img && img.complete && img.naturalWidth > 0) {
 
-                let baseSize = obj.width || 50; // Valeur de fallback
+                let baseSize = obj.width || 50;
                 const isAgent = obj.subtype === 'agent';
+                // Détection si c'est une icône de compétence (pas une image in-game comme une smoke)
                 const isAbilityIcon = obj.subtype === 'ability' && (obj.imageSrc.includes('_icon') || !obj.imageSrc.includes('_game'));
 
                 if (isAgent || isAbilityIcon) {
                     baseSize = globalIconSize;
                 }
-                // Application du scale de la map
+
                 const targetSize = baseSize * mapScale;
                 const centerX = obj.x;
                 const centerY = obj.y;
@@ -155,40 +163,53 @@ export const renderDrawings = (
 
                 ctx.save();
 
-
-                const isIconType = obj.subtype === 'icon'; // Les icônes "Danger", "Spike" n'ont pas de cadre
+                const isIconType = obj.subtype === 'icon';
+                // On met un cadre si c'est un agent ou une icône de compétence
                 const hasFrame = isAgent || (obj.imageSrc.includes('_icon') && !isIconType) || (obj.subtype === 'ability' && !obj.imageSrc.includes('_game'));
 
                 if (hasFrame) {
-                    // DESSIN DU FOND NOIR ET DU CADRE
+                    // --- COULEUR DYNAMIQUE ---
+                    // On essaie de deviner le nom de l'agent depuis le nom de l'image (ex: "killjoy_c_icon" -> "killjoy")
+                    // Ou depuis l'imageSrc directe si c'est un agent (ex: "jett")
+                    let agentName = obj.imageSrc.split('_')[0];
+                    if(isAgent) agentName = obj.imageSrc; // Si c'est un agent, le nom est direct
+
+                    const agentColor = getAgentColor(agentName); // Récupère la couleur HEX
+
                     const boxSize = targetSize;
                     const frameX = centerX - boxSize/2;
                     const frameY = centerY - boxSize/2;
-                    const borderRadius = 6; // Arrondi
+                    const borderRadius = 6 * mapScale; // Arrondi qui scale aussi
 
                     ctx.beginPath();
-                    // Compatibilité roundRect
                     // @ts-ignore
                     if (ctx.roundRect) ctx.roundRect(frameX, frameY, boxSize, boxSize, borderRadius);
                     else ctx.rect(frameX, frameY, boxSize, boxSize);
 
-                    ctx.fillStyle = '#1e293b'; // Fond sombre (Slate-800)
+                    // Fond coloré avec transparence (ex: Jaune Killjoy à 80% ou 100%)
+                    // Tu peux mettre 1.0 pour un fond plein, ou 0.8 pour laisser voir un peu le sol
+                    ctx.fillStyle = hexToRgba(agentColor, 0.8);
                     ctx.fill();
 
-                    // On clippe l'image dans le cadre pour qu'elle ne dépasse pas des bords arrondis
+                    // On clippe l'image
                     ctx.save();
                     ctx.clip();
+
+                    // Optionnel : Dessiner un petit fond sombre derrière l'image pour le contraste si l'icône est blanche
+                    // ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    // ctx.fillRect(frameX, frameY, boxSize, boxSize);
+
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                     ctx.restore();
 
                     // Bordure
-                    ctx.strokeStyle = '#cbd5e1'; // Gris clair (Slate-300)
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#ffffff'; // Bord blanc pour faire ressortir la couleur
+                    ctx.lineWidth = 1.5 * mapScale;
                     ctx.shadowColor = '#000000';
                     ctx.shadowBlur = 4;
                     ctx.stroke();
                 } else {
-                    // DESSIN SANS CADRE (Pour les smokes, mollys, icônes map)
+                    // DESSIN SANS CADRE (Smokes, etc.)
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                 }
 
@@ -197,7 +218,7 @@ export const renderDrawings = (
                 // Cadre de sélection (Drag)
                 if (draggingObjectId === obj.id) {
                     ctx.save();
-                    ctx.strokeStyle = '#22c55e';
+                    ctx.strokeStyle = '#22c55e'; // Vert de sélection
                     ctx.lineWidth = 2;
                     ctx.setLineDash([5, 5]);
                     ctx.strokeRect(centerX - targetSize/2 - 4, centerY - targetSize/2 - 4, targetSize + 8, targetSize + 8);

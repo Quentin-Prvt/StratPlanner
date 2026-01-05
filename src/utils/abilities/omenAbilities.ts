@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * DESSIN : Q - Paranoïa
@@ -12,26 +13,31 @@ export const drawOmenParanoia = (ctx: CanvasRenderingContext2D, obj: DrawingObje
     const width = ABILITY_SIZES['omen_q_width'] * mapScale;
     const length = ABILITY_SIZES['omen_q_length'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('omen'); // Indigo/Violet (#6366f1)
+    // Pour Omen, on veut un effet sombre "ombre"
+    // On peut utiliser la couleur agent mais assombrie ou avec plus d'opacité
+    const zoneColor = hexToRgba(agentHex, 0.5);
+    const strokeColor = '#8b5cf6'; // Violet un peu plus clair pour le contour
+
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     ctx.save();
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
-    // Style Omen : Violet sombre et mystérieux
-    // Ombre portée pour l'effet "ombre"
+    // Ombre portée
     ctx.shadowBlur = 15;
-    ctx.shadowColor = 'rgba(76, 29, 149, 0.8)';
+    ctx.shadowColor = agentHex;
 
     // Fond
-    ctx.fillStyle = 'rgba(46, 16, 101, 0.6)'; // Violet très foncé
+    ctx.fillStyle = zoneColor;
     ctx.fillRect(0, -width / 2, length, width);
 
     // Bordure
-    ctx.strokeStyle = '#8b5cf6'; // Violet plus clair
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2;
     ctx.strokeRect(0, -width / 2, length, width);
-
 
     ctx.restore();
 
@@ -39,39 +45,30 @@ export const drawOmenParanoia = (ctx: CanvasRenderingContext2D, obj: DrawingObje
     // P1 (Centre)
     ctx.beginPath();
     ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#4c1d95';
+    ctx.fillStyle = agentHex;
     ctx.fill();
 
-    // P2 (Handle Direction)
+    // P2 (Handle)
     ctx.beginPath();
     ctx.arc(p2.x, p2.y, 6, 0, Math.PI * 2);
     ctx.fillStyle = 'white';
-    ctx.strokeStyle = '#8b5cf6';
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
 };
 
-/**
- * HIT TEST
- */
+// ... check et update inchangés
 export const checkOmenHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-
-    // Clic Rotation (P2)
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'rotate' };
-
-    // Clic Centre (P1)
     if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 20) {
         return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
     }
     return null;
 };
 
-/**
- * UPDATE POSITION
- */
 export const updateOmenPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -81,7 +78,6 @@ export const updateOmenPosition = (
 ) => {
     const p1 = obj.points[0];
     const length = ABILITY_SIZES['omen_q_length'] * mapScale;
-
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -90,7 +86,6 @@ export const updateOmenPosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
-
     if (mode === 'center') {
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;
@@ -98,6 +93,5 @@ export const updateOmenPosition = (
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
         return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
     }
-
     return obj;
 };

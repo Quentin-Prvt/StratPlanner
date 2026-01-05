@@ -1,17 +1,26 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * DESSIN : C - Fast Lane (Double Mur)
  */
 export const drawNeonWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
-    const p1 = obj.points[0]; // Origine
-    const p2 = obj.points[1]; // Direction
+    const p1 = obj.points[0];
+    const p2 = obj.points[1];
 
-    const width = ABILITY_SIZES['neon_c_width'] * mapScale;   // Espace entre les murs
-    const length = ABILITY_SIZES['neon_c_length'] * mapScale; // Longueur
-    const wallThickness = 10; // Épaisseur visuelle des murs bleus
+    const width = ABILITY_SIZES['neon_c_width'] * mapScale;
+    const length = ABILITY_SIZES['neon_c_length'] * mapScale;
+    const wallThickness = 10;
+
+    // --- COULEURS ---
+    const agentHex = getAgentColor('neon'); // Jaune Électrique (#fde047)
+    // Neon a des murs bleus ingame, mais si tu veux uniformiser par agent :
+    const wallColor = agentHex;
+    // Ou garder le bleu électrique Neon :
+    //const wallColor = '#22d3ee';
+    const wallFill = hexToRgba(wallColor, 0.6);
 
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
@@ -19,11 +28,10 @@ export const drawNeonWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, 
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
-    // Couleur : Bleu électrique Neon
-    ctx.shadowBlur = 1
-    ctx.shadowColor = '#22d3ee'; // Cyan glow
-    ctx.fillStyle = 'rgba(34, 211, 238, 0.6)'; // Cyan remplissage
-    ctx.strokeStyle = '#22d3ee'; // Cyan bordure
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = wallColor;
+    ctx.fillStyle = wallFill;
+    ctx.strokeStyle = wallColor;
 
     // 1. Mur Gauche
     ctx.fillRect(0, -width / 2 - wallThickness, length, wallThickness);
@@ -31,24 +39,24 @@ export const drawNeonWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, 
     // 2. Mur Droit
     ctx.fillRect(0, width / 2, length, wallThickness);
 
-    // 3. Zone "Safe" au milieu (très transparente)
-    ctx.fillStyle = 'rgba(34, 211, 238, 0)';
+    // 3. Zone "Safe"
+    ctx.fillStyle = 'rgba(0,0,0,0)';
     ctx.fillRect(0, -width / 2, length, width);
 
     ctx.restore();
 
     // --- CONTRÔLES ---
-    // P1 (Centre)
+    // P1
     ctx.beginPath();
     ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#22d3ee';
+    ctx.fillStyle = wallColor; // Utilise la couleur du mur pour les contrôles
     ctx.fill();
 
-    // P2 (Handle Direction)
+    // P2
     ctx.beginPath();
     ctx.arc(p2.x, p2.y, 6, 0, Math.PI * 2);
     ctx.fillStyle = 'white';
-    ctx.strokeStyle = '#22d3ee';
+    ctx.strokeStyle = wallColor;
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
@@ -69,13 +77,18 @@ export const drawNeonStun = (
     const radius = ABILITY_SIZES['neon_q_radius'] * mapScale;
     const iconSize = ABILITY_SIZES['neon_q_icon_size'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('neon');
+    const zoneColor = hexToRgba(agentHex, 0.2); // Jaune transparent
+    const strokeColor = agentHex;
+
     ctx.save();
 
     // Zone
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(6, 182, 212, 0.2)'; // Cyan transparent
-    ctx.strokeStyle = '#22d3ee';
+    ctx.fillStyle = zoneColor;
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
@@ -90,32 +103,30 @@ export const drawNeonStun = (
             imageCache.set(obj.imageSrc, img);
         }
         if (img.complete && img.naturalWidth > 0) {
+            // Fond coloré
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, iconSize/2, 0, Math.PI*2);
+            ctx.fillStyle = agentHex;
+            ctx.fill();
+
             ctx.drawImage(img, center.x - iconSize/2, center.y - iconSize/2, iconSize, iconSize);
         }
     }
     ctx.restore();
 };
 
-/**
- * HIT TEST (Mur & Stun)
- */
+// ... check et update inchangés
 export const checkNeonHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
     const p1 = obj.points[0];
-
-    // Q (Stun) : Hitbox Icône uniquement
     if (obj.tool === 'neon_q_zone') {
         if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 30) {
             return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
         }
         return null;
     }
-
-    // C (Wall) : Handle ou Centre
     if (obj.tool === 'neon_c_wall') {
         const p2 = obj.points[1];
-        // Clic Rotation (P2)
         if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'rotate' };
-        // Clic Centre (P1)
         if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 20) {
             return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
         }
@@ -123,9 +134,6 @@ export const checkNeonHit = (pos: { x: number, y: number }, obj: DrawingObject) 
     return null;
 };
 
-/**
- * UPDATE POSITION
- */
 export const updateNeonPosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -134,15 +142,10 @@ export const updateNeonPosition = (
     mapScale: number = 1.0
 ) => {
     const p1 = obj.points[0];
-
-    // Q (Stun) : Simple déplacement
     if (obj.tool === 'neon_q_zone') {
         return { ...obj, points: [{ x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }] };
     }
-
-    // C (Wall)
     const length = ABILITY_SIZES['neon_c_length'] * mapScale;
-
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -151,7 +154,6 @@ export const updateNeonPosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
-
     if (mode === 'center') {
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;
@@ -159,6 +161,5 @@ export const updateNeonPosition = (
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
         return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
     }
-
     return obj;
 };

@@ -1,8 +1,9 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor } from '../agentColors';
 
 /**
- * DESSIN : Mur de Sage (Image Orientable)
+ * DESSIN : Mur de Sage
  */
 export const drawSageWall = (
     ctx: CanvasRenderingContext2D,
@@ -18,34 +19,38 @@ export const drawSageWall = (
     const size = ABILITY_SIZES['sage_c_size'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('sage'); // Cyan/Jade (#22d3ee)
+    const handleColor = agentHex;
+
     ctx.save();
 
     // 1. Image Rotatée
     ctx.translate(p1.x, p1.y);
-    ctx.rotate(angle + Math.PI / 2); // Ajustement +90deg (si l'image pointe vers le haut)
+    ctx.rotate(angle + Math.PI / 2);
 
     if (imageCache && obj.imageSrc) {
         let img = imageCache.get(obj.imageSrc);
         if (!img) {
             img = new Image();
-            img.src = `/abilities/${obj.imageSrc}.png`; // Doit être sage_c_game.png
+            img.src = `/abilities/${obj.imageSrc}.png`;
             img.onload = triggerRedraw;
             imageCache.set(obj.imageSrc, img);
         }
 
         if (img.complete && img.naturalWidth > 0) {
-
+            // Pas de fond coloré car le mur prend toute la place
             ctx.drawImage(img, -size/2, -size/2, size, size/6);
         }
     }
     ctx.restore();
 
-    // 2. Handle de rotation (Losange Cyan/Teal)
+    // 2. Handle de rotation
     ctx.save();
     ctx.translate(p2.x, p2.y);
     ctx.rotate(angle + Math.PI / 4);
 
-    ctx.fillStyle = '#2dd4bf'; // Teal-400 (Couleur Sage)
+    ctx.fillStyle = handleColor;
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
 
@@ -58,27 +63,18 @@ export const drawSageWall = (
     ctx.restore();
 };
 
-/**
- * HIT TEST
- */
+// ... check et update inchangés
 export const checkSageHit = (pos: { x: number, y: number }, obj: DrawingObject, mapScale: number = 1.0) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
     const size = ABILITY_SIZES['sage_c_size'] * mapScale;
-
-    // Clic Rotation
     if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'rotate' };
-
-    // Clic Image
     if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < size/2) {
         return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
     }
     return null;
 };
 
-/**
- * UPDATE POSITION
- */
 export const updateSagePosition = (
     obj: DrawingObject,
     pos: { x: number, y: number },
@@ -88,7 +84,6 @@ export const updateSagePosition = (
 ) => {
     const p1 = obj.points[0];
     const dist = ABILITY_SIZES['sage_c_handle_dist'] * mapScale;
-
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -97,7 +92,6 @@ export const updateSagePosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
-
     if (mode === 'center') {
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;

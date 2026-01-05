@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors';
 
 /**
  * DESSIN : Waylay X (Rectangle Directionnel)
@@ -13,13 +14,14 @@ export const drawWaylayUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     const length = ABILITY_SIZES['waylay_x_length'] * mapScale;
     const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
+    // --- COULEURS DYNAMIQUES ---
+    const agentHex = getAgentColor('waylay');
+    const mainColor = hexToRgba(agentHex, 0.4); // Fond transparent
+    const strokeColor = agentHex; // Bordure pleine
+
     ctx.save();
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
-
-    // --- STYLE WAYLAY (Ambre / Gris Tactique) ---
-    const mainColor = 'rgba(58,246,30,0.4)'; // Amber-500 transparent
-    const strokeColor = '#42d906'; // Amber-600
 
     ctx.shadowBlur = 10;
     ctx.shadowColor = strokeColor;
@@ -32,7 +34,6 @@ export const drawWaylayUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 3;
     ctx.strokeRect(0, -width / 2, length, width);
-
 
     ctx.restore();
 

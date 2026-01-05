@@ -38,7 +38,7 @@ export const createDrawingFromDrop = (
         id,
         tool: 'breach_x_zone',
         subtype: 'ability',
-        points: [{x, y}, {x, y: y - 305}],
+        points: [{x, y}, {x, y: y - 200}],
         color: '#ef4444',
         thickness: 0,
         opacity: 0.8
@@ -269,36 +269,57 @@ export const createDrawingFromDrop = (
     }
 
     // --- KILLJOY ---
-    if (name.startsWith('killjoy_')) {
-        if (name === 'killjoy_e') {
-            const dist = ABILITY_SIZES['killjoy_e_handle_dist'] || 60;
-            const toolName: StrokeType = 'killjoy_e_turret';
-            return {
-                id,
-                tool: toolName,
-                subtype: 'ability',
-                points: [{x, y}, {x, y: y - dist}],
-                imageSrc: 'killjoy_e_game',
-                color: '#eab308',
-                thickness: 0,
-                opacity: 1
-            };
-        }
-        let toolName: StrokeType = 'killjoy_q_zone';
-        let color = '#eab308';
-        if (name === 'killjoy_x') {
-            toolName = 'killjoy_x_zone';
-            color = '#06b6d4';
-        }
+    if (name === 'killjoy_c') {
         return {
-            id,
-            tool: toolName,
-            subtype: 'ability',
-            points: [{x, y}],
-            imageSrc: `${name}_icon`,
-            color: color,
-            thickness: 0,
-            opacity: 0.6
+            id: Date.now(),
+            tool: 'killjoy_c_zone', // Nanoswarm (Zone circulaire simple)
+            x, y,
+            points: [{ x, y }],
+            color: '#facc15',
+            thickness: 2,
+            opacity: 1,
+            imageSrc: 'killjoy_c_icon', // Affiche l'icône au centre
+            subtype: 'ability'
+        };
+    }
+    if (name === 'killjoy_q') {
+        return {
+            id: Date.now(),
+            tool: 'killjoy_q_zone', // Alarmbot (Double cercle)
+            x, y,
+            points: [{ x, y }],
+            color: '#facc15',
+            thickness: 2,
+            opacity: 1,
+            imageSrc: 'killjoy_q_icon',
+            subtype: 'ability'
+        };
+    }
+    if (name === 'killjoy_e') {
+
+        return {
+            id: Date.now(),
+            tool: 'killjoy_e_turret',
+            x, y,
+            points: [{ x, y }, { x: x + 50, y }],
+            color: '#facc15',
+            thickness: 2,
+            opacity: 1,
+            imageSrc: 'killjoy_e_game',
+            subtype: 'ability'
+        };
+    }
+    if (name === 'killjoy_x') {
+        return {
+            id: Date.now(),
+            tool: 'killjoy_x_zone', // Lockdown (Grand cercle)
+            x, y,
+            points: [{ x, y }],
+            color: '#facc15',
+            thickness: 2,
+            opacity: 1,
+            imageSrc: 'killjoy_x_icon',
+            subtype: 'ability'
         };
     }
 
@@ -449,7 +470,7 @@ export const createDrawingFromDrop = (
 
     // --- VIPER ---
     if (name === 'viper_e') {
-        const length = ABILITY_SIZES['viper_e_length'] || 1200;
+        const length = ABILITY_SIZES['viper_e_length'] || 800;
         const handleDist = length / 2;
         const toolName: StrokeType = 'viper_e_wall';
         return {

@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors'; // <-- Import
 
 export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject, mapScale: number = 1.0) => {
     if (obj.points.length < 2) return;
@@ -10,12 +11,15 @@ export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject
     const WIDTH = ABILITY_SIZES['breach_e_width'] * mapScale;
     const MAX_LEN = ABILITY_SIZES['breach_e_max_length'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('breach'); // Orange
+    const zoneColor = hexToRgba(agentHex, 0.4);
+
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const angle = Math.atan2(dy, dx);
     const dist = Math.sqrt(dx*dx + dy*dy);
 
-    // Clamping VISUEL (le dessin s'arrête au max, même si P2 est plus loin)
     const renderDist = Math.min(dist, MAX_LEN);
     const rectLength = Math.max(0, renderDist - GAP);
 
@@ -24,9 +28,9 @@ export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject
     ctx.rotate(angle);
 
     if (rectLength > 0) {
-        ctx.fillStyle = 'rgba(234, 179, 8, 0.4)';
+        ctx.fillStyle = zoneColor;
         ctx.fillRect(GAP, -WIDTH / 2, rectLength, WIDTH);
-        ctx.strokeStyle = '#22d3ee';
+        ctx.strokeStyle = agentHex; // Si tu veux tout orange
         ctx.lineWidth = 2;
         ctx.strokeRect(GAP, -WIDTH / 2, rectLength, WIDTH);
     }
@@ -38,15 +42,15 @@ export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject
     ctx.arc(p1.x, p1.y, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    // P2 (Handle Visuel) - Il doit suivre le bout du dessin
+    // P2 (Handle Visuel)
     const handleX = p1.x + Math.cos(angle) * renderDist;
     const handleY = p1.y + Math.sin(angle) * renderDist;
 
     ctx.save();
     ctx.translate(handleX, handleY);
     ctx.rotate(angle + Math.PI / 4);
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.strokeStyle = '#fca5a5';
+    ctx.fillStyle = hexToRgba(agentHex, 0.6); // Handle coloré
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.rect(-5, -5, 10, 10);
@@ -55,6 +59,7 @@ export const drawBreachStun = (ctx: CanvasRenderingContext2D, obj: DrawingObject
     ctx.restore();
 };
 
+// ... checkBreachStunHit et updateBreachStunPosition restent inchangés
 export const checkBreachStunHit = (
     pos: { x: number, y: number },
     obj: DrawingObject,
@@ -62,15 +67,11 @@ export const checkBreachStunHit = (
 ) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-
     const MAX_LEN = ABILITY_SIZES['breach_e_max_length'] * mapScale;
-
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const angle = Math.atan2(dy, dx);
     const dist = Math.sqrt(dx*dx + dy*dy);
-
-    // On doit chercher le handle là où il est dessiné (clamped)
     const renderDist = Math.min(dist, MAX_LEN);
     const handleX = p1.x + Math.cos(angle) * renderDist;
     const handleY = p1.y + Math.sin(angle) * renderDist;
@@ -87,7 +88,6 @@ export const updateBreachStunPosition = (
     dragOffset: { x: number, y: number },
 ) => {
     if (mode === 'handle') {
-        // Pour le stun, on laisse P2 libre (la souris), le dessin et le hit clamperont
         return { ...obj, points: [obj.points[0], { x: pos.x, y: pos.y }] };
     }
     if (mode === 'center') {

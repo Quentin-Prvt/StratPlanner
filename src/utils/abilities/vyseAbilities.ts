@@ -27,7 +27,7 @@ export const drawVyseWall = (ctx: CanvasRenderingContext2D, obj: DrawingObject, 
     ctx.rect(-length / 2, -width / 2, length, width);
     ctx.fillStyle = 'rgb(168,85,247)'; // Gris métal semi-transparent
     ctx.strokeStyle = mainColor;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 1;
     ctx.fill();
     ctx.stroke();
 

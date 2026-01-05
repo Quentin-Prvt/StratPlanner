@@ -134,13 +134,19 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
 
+        // --- OPTIMISATION QUALITÉ D'IMAGE ---
+        // C'est ici que la magie opère pour garder la qualité en réduisant la taille
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high'; // Force le navigateur à utiliser le meilleur algorithme de redimensionnement
+        // ------------------------------------
+
         // 1. On récupère le Scale actuel
         const mapScale = getCurrentScale();
 
         // 2. On le passe au renderer
         // @ts-ignore
         renderDrawings(ctx, drawings, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize);
-        }, [drawings, draggingObjectId, showZones, currentMapSrc, iconSize]);
+    }, [drawings, draggingObjectId, showZones, currentMapSrc, iconSize]);
 
 
     const syncCanvasSize = useCallback(() => {
@@ -259,8 +265,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         }
 
         const mapScale = getCurrentScale();
-        const baseSize = 36;
-        const scaledSize = baseSize * mapScale; // TAILLE DES AGENTS
+        // Ici on calcule la taille initiale en fonction du slider
         const pos = getMousePos(e);
 
         if (currentTool === 'cursor') {
@@ -275,7 +280,11 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     }
                 }
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
-                    const w = obj.width || 50; const h = obj.height || 50;
+                    // Pour le hit test, on utilise la taille dynamique
+                    // Si l'objet n'a pas de largeur fixe (width), on assume qu'il utilise le slider global (iconSize)
+                    const w = (obj.width || iconSize) * mapScale;
+                    const h = (obj.height || iconSize) * mapScale;
+
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
                         setDraggingObjectId(obj.id); setSpecialDragMode(null); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
@@ -296,7 +305,15 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         if (currentTool === 'agent') {
             const newAgent: DrawingObject = {
                 id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1,
-                imageSrc: selectedAgent, x: pos.x, y: pos.y, width: scaledSize, height: scaledSize
+                imageSrc: selectedAgent, x: pos.x, y: pos.y,
+                // Important : on n'enregistre PAS la taille scalée en dur si on veut que le slider
+                // contrôle tous les agents en temps réel. Si tu veux que chaque agent garde sa taille
+                // de création, laisse 'width: scaledSize'.
+                // Si tu veux que le slider modifie TOUS les agents existants, ne mets pas de width ici
+                // et laisse le renderer utiliser iconSize.
+                // Ici, je suppose que tu veux que le nouvel agent utilise la taille du slider actuel :
+                width: iconSize, // On stocke la taille de base (30px par défaut), le renderer appliquera le mapScale
+                height: iconSize
             };
             setDrawings(prev => [...prev, newAgent]);
             return;
@@ -512,7 +529,10 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     return (
         <div className="flex flex-col lg:flex-row h-full w-full
           bg-[#121212]
-            ">
+            bg-[linear-gradient(0deg,rgba(255,255,255,0.03),rgba(0,0,0,0.05)),
+            radial-gradient(circle_at_10%_20%,rgba(255,255,255,0.04),transparent_35%),
+            radial-gradient(circle_at_90%_80%,rgba(0,0,0,0.5),transparent_45%),
+            linear-gradient(180deg,rgba(0,0,0,0.6),transparent)]">
             <div className="absolute top-4 left-4 z-30 lg:static lg:h-full lg:w-auto lg:p-4 lg:bg-[#181b1e] lg:border-r lg:border-gray-800">
                 <ToolsSidebar
                     currentTool={currentTool} setTool={setCurrentTool}
@@ -539,7 +559,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                             src={currentMapSrc}
                             alt="Map"
                             draggable={false}
-                            className="block select-none pointer-events-none h-auto shadow-lg p-50"
+                            className="block select-none pointer-events-none h-auto shadow-lg p-10"
                             style={{ width: '100%', minWidth: '1024px' }}
                             onLoad={syncCanvasSize}
                         />                    )}

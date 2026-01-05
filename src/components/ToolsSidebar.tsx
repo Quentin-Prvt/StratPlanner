@@ -243,7 +243,7 @@ export const ToolsSidebar = ({
                         </div>
                         <input
                             type="range"
-                            min="10"
+                            min="20"
                             max="60"
                             step="2"
                             value={iconSize}

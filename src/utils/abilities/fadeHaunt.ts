@@ -1,5 +1,6 @@
 import type { DrawingObject } from '../../types/canvas';
 import { ABILITY_SIZES } from '../abilitySizes';
+import { getAgentColor, hexToRgba } from '../agentColors'; // <-- Import
 
 export const drawFadeHaunt = (
     ctx: CanvasRenderingContext2D,
@@ -15,15 +16,19 @@ export const drawFadeHaunt = (
     const radius = ABILITY_SIZES['fade_e_radius'] * mapScale;
     const iconSize = ABILITY_SIZES['fade_e_icon_size'] * mapScale;
 
+    // --- COULEURS ---
+    const agentHex = getAgentColor('fade');
+    const zoneColor = hexToRgba(agentHex, 0.1);
+    const strokeColor = '#818cf8'; // Indigo clair
+
     ctx.save();
 
     // 1. Zone de Reveal
     if (showZones) {
         ctx.beginPath();
         ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-        // Indigo plus clair et plus transparent pour le Reveal
-        ctx.fillStyle = 'rgba(129, 140, 248, 0.1)';
-        ctx.strokeStyle = '#818cf8';
+        ctx.fillStyle = zoneColor;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
         ctx.fill();
         ctx.stroke();
@@ -42,6 +47,12 @@ export const drawFadeHaunt = (
         }
 
         if (img.complete && img.naturalWidth > 0) {
+            // Fond coloré
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, iconSize/2, 0, Math.PI*2);
+            ctx.fillStyle = agentHex;
+            ctx.fill();
+
             ctx.drawImage(
                 img,
                 center.x - iconSize / 2,
@@ -55,6 +66,7 @@ export const drawFadeHaunt = (
     ctx.restore();
 };
 
+// ... check et update inchangés
 export const checkFadeHauntHit = (
     pos: { x: number, y: number },
     obj: DrawingObject
