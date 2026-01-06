@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react'; // Ajout de useState
 import {
     Pencil, Eraser, Minus, MoveUpRight, ArrowBigRightDash, Square,
-    Hand, MousePointer2, Settings, Hammer, Type, Trash2, FolderOpen
+    Hand, MousePointer2, Settings, Hammer, Type, Trash2, FolderOpen, RefreshCcw // Ajout de RefreshCcw pour l'icone reset
 } from 'lucide-react';
 
 import type { ToolType, StrokeType } from '../types/canvas';
@@ -26,7 +26,8 @@ interface ToolsSidebarProps {
     iconSize: number;
     setIconSize: (s: number) => void;
 
-    // Seulement dossiers et suppression
+    // Actions
+    onClearAll: () => void; // <--- NOUVELLE PROP
     folders: { id: string, name: string }[];
     currentFolderId: string;
     onFolderChange: (folderId: string) => void;
@@ -42,8 +43,12 @@ export const ToolsSidebar = ({
                                  selectedAgent, setSelectedAgent,
                                  showZones, setShowZones,
                                  iconSize, setIconSize,
+                                 onClearAll, // <--- Récupération de la prop
                                  folders, currentFolderId, onFolderChange, onDeleteStrategy
                              }: ToolsSidebarProps) => {
+
+    // État pour la confirmation du bouton "Tout effacer"
+    const [confirmClear, setConfirmClear] = useState(false);
 
     const colors = ['#ffffff', '#000000', '#ef4444', '#ec4899', '#facc15', '#84cc16', '#14532d', '#3b82f6', '#8b5cf6', '#713f12'];
     const agents = ['astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock', 'fade', 'gekko', 'harbor', 'iso', 'jett', 'kayo', 'killjoy', 'neon', 'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova','tejo','veto', 'viper', 'vyse','waylay', 'yoru'];
@@ -54,6 +59,18 @@ export const ToolsSidebar = ({
     const activatePen = () => { setTool('pen'); setThickness(4); };
     const activateEraser = () => { setTool('eraser'); setThickness(30); };
     const isDrawingMode = currentTool === 'pen' || currentTool === 'eraser';
+
+    // Gestion du clic "Tout effacer" avec confirmation
+    const handleClearClick = () => {
+        if (confirmClear) {
+            onClearAll();
+            setConfirmClear(false);
+        } else {
+            setConfirmClear(true);
+            // Annule la confirmation après 3 secondes si pas de clic
+            setTimeout(() => setConfirmClear(false), 3000);
+        }
+    };
 
     const handleDragStart = (e: React.DragEvent, type: 'agent' | 'ability' | 'icon', name: string) => {
         const dragData = JSON.stringify({ type, name });
@@ -139,7 +156,7 @@ export const ToolsSidebar = ({
                     <button onClick={() => setShowZones(!showZones)} className={`w-full flex items-center justify-between px-3 py-2 rounded transition-colors ${showZones ? 'bg-gray-700 text-white' : 'bg-slate-900 text-gray-400 hover:bg-slate-700'}`}><span className="text-xs font-bold uppercase">Zones de portée</span><div className={`w-3 h-3 rounded-full transition-all ${showZones ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-gray-600'}`} /></button>
                     <div className="flex flex-col gap-2 pt-2 border-t border-gray-700"><div className="flex justify-between items-center text-gray-400 text-xs uppercase font-bold"><span>Taille Icônes</span><span className="text-white">{iconSize}px</span></div><input type="range" min="20" max="60" step="2" value={iconSize} onChange={(e) => setIconSize(parseInt(e.target.value))} className="w-full h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-500" /></div>
 
-                    {/* SECTION DOSSIER & SUPPRESSION (SANS EQUIPE) */}
+                    {/* SECTION DOSSIER & SUPPRESSION */}
                     <div className="flex flex-col gap-3 pt-2 border-t border-gray-700">
                         <span className="text-sm font-medium text-gray-400 pb-1">Organisation</span>
                         <div className="flex flex-col gap-1.5">
@@ -157,7 +174,21 @@ export const ToolsSidebar = ({
                                 ))}
                             </select>
                         </div>
-                        <button onClick={onDeleteStrategy} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-red-900/20 mt-2">
+
+                        {/* --- NOUVEAU BOUTON : TOUT EFFACER --- */}
+                        <button
+                            onClick={handleClearClick}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-sm transition-all mt-2 ${
+                                confirmClear
+                                    ? 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse'
+                                    : 'bg-slate-700 hover:bg-slate-600 text-gray-300'
+                            }`}
+                        >
+                            <RefreshCcw size={16} className={confirmClear ? "animate-spin" : ""} />
+                            {confirmClear ? "Confirmer l'effacement ?" : "Tout effacer sur la carte"}
+                        </button>
+
+                        <button onClick={onDeleteStrategy} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-red-900/20">
                             <Trash2 size={16} /> Supprimer la stratégie
                         </button>
                     </div>

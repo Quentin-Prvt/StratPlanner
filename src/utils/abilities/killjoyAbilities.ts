@@ -105,8 +105,9 @@ export const drawKilljoyTurret = (
     obj: DrawingObject,
     imageCache: Map<string, HTMLImageElement> | undefined,
     triggerRedraw: () => void,
-    mapScale: number = 1.0,
-    showZones: boolean = true
+    showZones: boolean = true,
+    mapScale: number = 1.0
+
 ) => {
     if (obj.points.length < 2) return;
     const p1 = obj.points[0];

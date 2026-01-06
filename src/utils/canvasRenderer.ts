@@ -150,7 +150,7 @@ export const renderDrawings = (
             return;
         }
         if (obj.tool === 'killjoy_e_turret') {
-            drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw,  mapScale);
+            drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, showZones,  mapScale);
             return;
         }
 
