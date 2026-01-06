@@ -5,6 +5,7 @@ import { ToolsSidebar } from './ToolsSidebar';
 import { LoadModal } from './LoadModal';
 import { ConfirmModal } from './ConfirmModal';
 import { useSupabaseStrategies } from '../hooks/useSupabase';
+import { useRealtimeStrategy } from '../hooks/useRealtimeStrategy'; // <--- 1. NOUVEL IMPORT
 import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing';
 import { renderDrawings } from '../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../utils/dropFactory';
@@ -29,6 +30,10 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
 
+
+    const isInteractingRef = useRef(false); // Est-ce que je clique/dessine ?
+    const isRemoteUpdate = useRef(false);   // Est-ce une update serveur ?
+
     const pointsRef = useRef<{x: number, y: number}[]>([]);
     const startPosRef = useRef<{x: number, y: number}>({x: 0, y: 0});
     const panStartRef = useRef({ x: 0, y: 0 });
@@ -51,7 +56,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
     // Modales
     const [isTextModalOpen, setIsTextModalOpen] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false); // <--- NOUVEL ÉTAT
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingTextId, setEditingTextId] = useState<number | null>(null);
 
     // Outils & Style
@@ -104,6 +109,14 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         loadInitialData();
     }, [strategyId]);
 
+    // --- 3. INTEGRATION DU REALTIME ---
+    const { processPendingUpdates } = useRealtimeStrategy(
+        strategyId,
+        setDrawings,
+        isRemoteUpdate,
+        isInteractingRef
+    );
+
     // --- AUTO-SAVE ---
     const debouncedSave = useMemo(
         () => debounce((id: string, data: any[]) => {
@@ -114,6 +127,14 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
     useEffect(() => {
         if (!isLoaded || !strategyId) return;
+
+        // --- 4. PROTECTION BOUCLE INFINIE ---
+        // Si la mise à jour vient du serveur, on ne la renvoie pas
+        if (isRemoteUpdate.current) {
+            isRemoteUpdate.current = false;
+            return;
+        }
+
         debouncedSave(strategyId, drawings);
         return () => debouncedSave.cancel();
     }, [drawings, strategyId, isLoaded, debouncedSave]);
@@ -129,14 +150,11 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         }
     };
 
-    // --- LOGIQUE DE SUPPRESSION (MODIFIÉE) ---
-
-    // 1. Déclenché par le bouton dans la sidebar : Ouvre la modale
+    // --- LOGIQUE DE SUPPRESSION ---
     const handleDeleteRequest = () => {
         setShowDeleteModal(true);
     };
 
-    // 2. Déclenché par le bouton "Confirmer" de la modale
     const confirmDelete = async () => {
         if (!strategyId) return;
 
@@ -146,10 +164,9 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             .eq('id', strategyId);
 
         if (!error) {
-            navigate('/'); // Redirection
+            navigate('/');
         } else {
             console.error("Erreur suppression:", error);
-            // Ici tu pourrais remettre un petit toast d'erreur si tu veux
         }
     };
 
@@ -248,16 +265,12 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         setIsTextModalOpen(false);
         setCurrentTool('cursor');
     };
-/*
-    const handleCloseModal = () => {
-        setIsTextModalOpen(false);
-        setEditingTextId(null);
-        setCurrentTool('cursor');
-    };*/
 
     // --- EVENT HANDLERS (MOUSE & DROP) ---
-    // (J'ai compressé le code répétitif pour la lisibilité, la logique reste identique à la tienne)
     const handleMouseDown = (e: React.MouseEvent) => {
+        // --- 5. SIGNALER QU'ON INTERAGIT ---
+        isInteractingRef.current = true;
+
         if (e.button === 1) {
             setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY };
             if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -361,7 +374,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         if (isPanning) {
             setIsPanning(false);
             if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab');
-            return;
+            // Pas de return ici, on veut exécuter le code de fin d'interaction
         }
         setDraggingObjectId(null); setSpecialDragMode(null); setDragOffset({ x: 0, y: 0 });
         if (isDrawing) {
@@ -377,6 +390,16 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             }
             pointsRef.current = [];
         }
+
+        // --- 6. FIN D'INTERACTION : ON TRAITE LES UPDATES EN ATTENTE ---
+        isInteractingRef.current = false;
+        processPendingUpdates();
+    };
+
+    const handleMouseLeave = () => {
+        handleMouseUp();
+        // Sécurité supplémentaire
+        isInteractingRef.current = false;
     };
 
     const handleContextMenu = (e: React.MouseEvent) => {
@@ -472,7 +495,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             </div>
 
             <div ref={containerRef} className="relative flex-1 w-full h-full overflow-hidden select-none" style={{ cursor: getCursorStyle() }}
-                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}
                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }} onDrop={handleDrop} onContextMenu={handleContextMenu} onDoubleClick={handleDoubleClick}>
 
                 <div ref={contentRef} className="origin-top-left absolute top-0 left-0">
