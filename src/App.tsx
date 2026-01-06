@@ -10,7 +10,7 @@ import { Register } from './pages/Register';
 import {Header } from './components/Header';
 import { Profile } from './pages/Profile';
 
-// Gardien : Empêche l'accès aux pages protégées si non connecté
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
 

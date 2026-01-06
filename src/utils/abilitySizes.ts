@@ -15,22 +15,22 @@ export const ABILITY_SIZES: Record<string, number> = {
     'breach_x_fixed_length': 200, // Longueur FIXE totale (gap inclus) 305
 
     // ASTRA
-    'astra_c': 70, 'astra_q': 55, 'astra_e': 60,
+    'astra_c': 90, 'astra_q': 70, 'astra_e': 80,
 
     // BRIMSTONE
     'brimstone_c_radius': 50,
     'brimstone_c_icon_size': 20,
-    'brimstone_e': 65,
-    'brimstone_q': 65,
+    'brimstone_e': 90,
+    'brimstone_q': 90,
     'brimstone_x_radius': 65,
 
     // CHAMBER
     'chamber_q': 20, 'chamber_x': 20,
-    'chamber_c_radius': 46, 'chamber_c_icon_size': 20,
-    'chamber_e_radius': 95, 'chamber_e_icon_size': 20,
+    'chamber_c_radius': 64, 'chamber_c_icon_size': 20,
+    'chamber_e_radius': 140, 'chamber_e_icon_size': 20,
 
     // CLOVE
-    'clove_c': 20, 'clove_x': 20, 'clove_q': 70, 'clove_e': 67,
+    'clove_c': 20, 'clove_x': 20, 'clove_q': 80, 'clove_e': 80,
 
     // CYPHER
     'cypher_c_max_length': 94, 'cypher_c_box_size': 8,
