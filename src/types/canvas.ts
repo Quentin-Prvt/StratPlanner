@@ -51,9 +51,14 @@ export interface DrawingObject {
 }
 
 export interface StrategyRecord {
-    id: number;
-    name: string;
+    id: string;
+    title: string;
+    name?: string;
     map_name: string;
     data: DrawingObject[];
     created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+    folder_id?: number | null;
+    team_id?: string | null;
 }
