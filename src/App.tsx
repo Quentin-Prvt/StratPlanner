@@ -2,12 +2,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // --- PAGES ---
-import { Dashboard } from './pages/Dashboard';       // Nouvelle page d'accueil (Dossiers/Strats)
-import { MapSelector } from './pages/MapSelector';   // Ancien Home.tsx (Choix de la map)
-import { StrategyEditorPage } from './pages/StrategyEditorPage'; // Page qui contient EditorCanvas
-import { Login } from './pages/Login';               // Page de connexion
-import { Register } from './pages/Register';         // Page d'inscription
+import { Dashboard } from './pages/Dashboard';
+import { MapSelector } from './pages/MapSelector';
+import { StrategyEditorPage } from './pages/StrategyEditorPage';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import {Header } from './components/Header';
+import { Profile } from './pages/Profile';
 
 // Gardien : Empêche l'accès aux pages protégées si non connecté
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -51,21 +52,27 @@ function App() {
 
                         {/* --- ROUTES PROTÉGÉES --- */}
 
-                        {/* 1. Dashboard : Liste des dossiers et stratégies */}
+                        {/*  Dashboard : Liste des dossiers et stratégies */}
                         <Route path="/" element={
                             <ProtectedRoute>
                                 <Dashboard />
                             </ProtectedRoute>
                         } />
+                        {/*  Profile : */}
+                        <Route path="/profile" element={
+                            <ProtectedRoute>
+                                <Profile />
+                            </ProtectedRoute>
+                        } />
 
-                        {/* 2. Création (Ancien Home) : Choix de la map */}
+                        {/*  Création (Ancien Home) : Choix de la map */}
                         <Route path="/create" element={
                             <ProtectedRoute>
                                 <MapSelector />
                             </ProtectedRoute>
                         } />
 
-                        {/* 3. Éditeur : Modification de la stratégie */}
+                        {/*  Éditeur : Modification de la stratégie */}
                         <Route path="/editor/:id" element={
                             <ProtectedRoute>
                                 <StrategyEditorPage />

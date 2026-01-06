@@ -2,15 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupabaseStrategies, type Folder } from '../hooks/useSupabase';
 import { MAP_CONFIGS } from '../utils/mapsRegistry';
-import { useAuth } from '../contexts/AuthContext';
 import {
-    FolderPlus, Trash2, Plus, LogOut, Folder as FolderIcon,
+    FolderPlus, Trash2, Plus, Folder as FolderIcon,
     FolderOpen, Map as MapIcon, User
 } from 'lucide-react';
 
 export const Dashboard = () => {
     const navigate = useNavigate();
-    const { signOut } = useAuth();
 
     // --- HOOKS ---
     const {
@@ -60,15 +58,13 @@ export const Dashboard = () => {
     const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
     return (
-        <div className="min-h-screen bg-[#121212] text-white flex font-sans">
+        <div className="flex flex-1 h-[calc(100vh-3.5rem)] overflow-hidden bg-[#121212] text-white font-sans">
+            {/* Note: h-[calc(100vh-3.5rem)] compense la hauteur du Header global (h-14 = 3.5rem) */}
 
-            {/* --- SIDEBAR --- */}
-            <div className="w-72 bg-[#181b1e] border-r border-gray-800 flex flex-col">
-                <div className="p-6 border-b border-gray-800">
-                    <h1 className="text-xl font-black tracking-wider text-[#ff4655] italic">STRAT PLANNER</h1>
-                </div>
-
-                <div className="p-4 border-b border-gray-800 space-y-2">
+            {/* --- SIDEBAR (GAUCHE) --- */}
+            <div className="w-72 bg-[#181b1e] border-r border-gray-800 flex flex-col shrink-0">
+                {/* Titre Sidebar - Optionnel si déjà dans le Header, mais utile pour le contexte */}
+                <div className="p-4 border-b border-gray-800 space-y-2 mt-2">
                     <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Espace de travail</div>
                     <div className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/50">
                         <User size={18} />
@@ -76,7 +72,7 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* FOLDERS LIST */}
+                {/* LISTE DES DOSSIERS */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-1">
                     <div className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">
                         Fichiers
@@ -117,40 +113,38 @@ export const Dashboard = () => {
 
                     <button
                         onClick={() => setIsCreateFolderModalOpen(true)}
-                        className="w-full flex items-center gap-2 px-4 py-2 mt-4 text-sm text-gray-500 hover:text-[#ff4655] transition-colors"
+                        className="w-full flex items-center gap-2 px-4 py-2 mt-4 text-sm text-gray-500 hover:text-[#ff4655] transition-colors border border-dashed border-gray-800 hover:border-[#ff4655]/50 rounded-lg"
                     >
                         <FolderPlus size={16} />
                         <span>Nouveau dossier</span>
                     </button>
                 </div>
-
-                <div className="p-4 border-t border-gray-800">
-                    <button onClick={signOut} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-red-500/10 rounded-lg transition-colors">
-                        <LogOut size={18} /> Déconnexion
-                    </button>
-                </div>
             </div>
 
-            {/* --- MAIN CONTENT --- */}
+            {/* --- CONTENU PRINCIPAL (DROITE) --- */}
             <div className="flex-1 flex flex-col overflow-hidden bg-[#0f1113]">
-                {/* Header */}
-                <div className="h-20 border-b border-gray-800 flex items-center justify-between px-8 bg-[#181b1e]">
-                    <div>
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            {currentFolderId === null ? <FolderOpen size={24} className="text-[#ff4655]" /> : <FolderIcon size={24} className="text-[#ff4655]" />}
+
+                {/* BARRE D'OUTILS DASHBOARD (Sous le Header Global) */}
+                <div className="h-16 border-b border-gray-800 flex items-center justify-between px-8 bg-[#181b1e] shrink-0">
+
+                    {/* Fil d'ariane / Titre Dossier */}
+                    <div className="flex items-center gap-3">
+                        {currentFolderId === null ? <FolderOpen size={24} className="text-[#ff4655]" /> : <FolderIcon size={24} className="text-[#ff4655]" />}
+                        <h2 className="text-xl font-bold text-white">
                             {currentFolderId === null ? 'Racine' : folders.find((f: Folder) => f.id === currentFolderId)?.name}
                         </h2>
                     </div>
 
+                    {/* Bouton Création */}
                     <button
                         onClick={() => navigate('/create')}
-                        className="bg-[#ff4655] hover:bg-[#e03e4b] text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-red-900/20"
+                        className="bg-[#ff4655] hover:bg-[#e03e4b] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-red-900/20"
                     >
                         <Plus size={20} /> <span className="hidden sm:inline">Nouvelle Stratégie</span>
                     </button>
                 </div>
 
-                {/* Content Grid */}
+                {/* GRILLE DES STRATÉGIES */}
                 <div className="flex-1 overflow-y-auto p-8">
                     {isLoading ? (
                         <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff4655]"></div></div>
@@ -206,7 +200,7 @@ export const Dashboard = () => {
                 </div>
             </div>
 
-            {/* MODAL */}
+            {/* MODAL NOUVEAU DOSSIER */}
             {isCreateFolderModalOpen && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] backdrop-blur-sm animate-in fade-in duration-200">
                     <form onSubmit={handleCreateFolder} className="bg-[#1e2327] p-6 rounded-xl border border-gray-700 w-full max-w-sm shadow-2xl">

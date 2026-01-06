@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../supabaseClient.ts';
+import { Mail, Lock, Loader2, AlertCircle, User } from 'lucide-react';
 
 export const Register = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
+    const [username, setUsername] = useState(''); // Nouvel état
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
 
@@ -19,11 +20,16 @@ export const Register = () => {
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
+                options: {
+                    // C'est ici qu'on sauvegarde le pseudo
+                    data: {
+                        username: username,
+                    }
+                }
             });
             if (error) throw error;
 
-            // Optionnel : Connexion auto ou redirection login
-            alert("Compte créé ! Connectez-vous.");
+            alert("Compte créé ! Vérifiez vos emails ou connectez-vous.");
             navigate('/login');
         } catch (err: any) {
             setError(err.message || "Erreur d'inscription");
@@ -46,6 +52,20 @@ export const Register = () => {
                 )}
 
                 <form onSubmit={handleRegister} className="flex flex-col gap-4">
+                    {/* CHAMP USERNAME AJOUTÉ */}
+                    <div className="relative group">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Nom d'utilisateur"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            required
+                            minLength={3}
+                            className="w-full bg-[#0f172a] text-white border border-gray-700 rounded-lg py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
+                        />
+                    </div>
+
                     <div className="relative group">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />
                         <input
