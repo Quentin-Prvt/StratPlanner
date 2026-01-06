@@ -172,6 +172,20 @@ export const useSupabaseStrategies = () => {
         if (data) setFolders(prev => [...prev, data]);
     };
 
+    const renameFolder = async (id: number, newName: string) => {
+        const { error } = await supabase
+            .from('folders')
+            .update({ name: newName })
+            .eq('id', id);
+
+        if (!error) {
+            // Mise à jour locale pour éviter un re-fetch complet
+            setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+        } else {
+            console.error("Erreur rename folder:", error);
+        }
+    };
+
     const deleteFolder = async (id: number) => {
         const { error } = await supabase
             .from('folders')
@@ -192,6 +206,6 @@ export const useSupabaseStrategies = () => {
         showLoadModal, setShowLoadModal,
         fetchStrategies, fetchFolders, getStrategyById,
         createNewStrategy, updateStrategyData, deleteStrategy,
-        createFolder, deleteFolder, moveStrategy
+        createFolder, deleteFolder, moveStrategy, renameFolder
     };
 };
