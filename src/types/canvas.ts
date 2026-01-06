@@ -50,12 +50,18 @@ export interface DrawingObject {
     fontStyle?: string;
 }
 
+export interface StrategyStep {
+    id: string;
+    name: string;
+    data: DrawingObject[];
+}
+
 export interface StrategyRecord {
     id: string;
     title: string;
     name?: string;
     map_name: string;
-    data: DrawingObject[];
+    data: any;
     created_at?: string;
     updated_at?: string;
     user_id?: string;

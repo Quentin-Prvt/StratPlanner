@@ -5,12 +5,12 @@ import { ToolsSidebar } from './ToolsSidebar';
 import { LoadModal } from './LoadModal';
 import { ConfirmModal } from './ConfirmModal';
 import { useSupabaseStrategies } from '../hooks/useSupabase';
-import { useRealtimeStrategy } from '../hooks/useRealtimeStrategy'; // <--- 1. NOUVEL IMPORT
+import { StepsBar } from './StepsBar';
 import { drawSmoothLine, drawArrowHead } from '../utils/canvasDrawing';
 import { renderDrawings } from '../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../utils/dropFactory';
 import { TextEditorModal } from './TextEditorModal';
-import type { DrawingObject, ToolType, StrokeType } from '../types/canvas';
+import type { DrawingObject, ToolType, StrokeType, StrategyStep } from '../types/canvas';
 
 import { useCanvasZoom } from '../hooks/useCanvasZoom';
 import { checkAbilityHit, updateAbilityPosition } from '../utils/canvasHitDetection';
@@ -30,9 +30,8 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
 
-
-    const isInteractingRef = useRef(false); // Est-ce que je clique/dessine ?
-    const isRemoteUpdate = useRef(false);   // Est-ce une update serveur ?
+    const isInteractingRef = useRef(false);
+    const isRemoteUpdate = useRef(false);
 
     const pointsRef = useRef<{x: number, y: number}[]>([]);
     const startPosRef = useRef<{x: number, y: number}>({x: 0, y: 0});
@@ -46,7 +45,12 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
     // --- STATES ---
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentMapSrc, setCurrentMapSrc] = useState<string | null>(null);
-    const [drawings, setDrawings] = useState<DrawingObject[]>([]);
+
+    // Steps State
+    const [steps, setSteps] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [] }]);
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const drawings = steps[currentStepIndex]?.data || [];
+
     const [showZones, setShowZones] = useState(true);
     const [iconSize, setIconSize] = useState(30);
 
@@ -80,6 +84,58 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         return entry ? entry[1].scale : 1.0;
     };
 
+    // Wrapper pour mettre à jour les dessins de l'étape active
+    const updateDrawings = useCallback((action: React.SetStateAction<DrawingObject[]>) => {
+        setSteps(prevSteps => {
+            const newSteps = [...prevSteps];
+            const currentData = newSteps[currentStepIndex].data;
+
+            const newData = typeof action === 'function'
+                ? (action as (prev: DrawingObject[]) => DrawingObject[])(currentData)
+                : action;
+
+            newSteps[currentStepIndex] = {
+                ...newSteps[currentStepIndex],
+                data: newData
+            };
+            return newSteps;
+        });
+    }, [currentStepIndex]);
+
+    // --- GESTION DES ÉTAPES ---
+    const handleAddStep = () => {
+        setSteps(prev => [...prev, { id: Date.now().toString(), name: `Phase ${prev.length + 1}`, data: [] }]);
+        setCurrentStepIndex(prev => prev + 1);
+    };
+
+    const handleDuplicateStep = () => {
+        const currentStep = steps[currentStepIndex];
+        const clonedData = JSON.parse(JSON.stringify(currentStep.data));
+        const newStep = {
+            id: Date.now().toString(),
+            name: `${currentStep.name} (Copy)`,
+            data: clonedData
+        };
+        setSteps(prev => {
+            const newSteps = [...prev];
+            newSteps.splice(currentStepIndex + 1, 0, newStep);
+            return newSteps;
+        });
+        setCurrentStepIndex(prev => prev + 1);
+    };
+
+    const handleDeleteStep = (index: number) => {
+        if (steps.length <= 1) return;
+        setSteps(prev => prev.filter((_, i) => i !== index));
+        if (currentStepIndex >= index && currentStepIndex > 0) {
+            setCurrentStepIndex(prev => prev - 1);
+        }
+    };
+
+    const handleRenameStep = (index: number, newName: string) => {
+        setSteps(prev => prev.map((s, i) => i === index ? { ...s, name: newName } : s));
+    };
+
     // --- FETCH DOSSIERS ---
     useEffect(() => {
         const fetchFolders = async () => {
@@ -96,12 +152,22 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             const data = await getStrategyById(strategyId);
 
             if (data) {
-                if (data.data) setDrawings(data.data);
-                if (data.folder_id) setCurrentFolderId(data.folder_id);
+                if (data.folder_id) setCurrentFolderId(data.folder_id.toString());
                 if (data.map_name) {
                     const mapKey = data.map_name.toLowerCase();
                     const mapConfig = MAP_CONFIGS[mapKey];
                     if (mapConfig) setCurrentMapSrc(mapConfig.src);
+                }
+
+                // MIGRATION V1 -> V2
+                const rawData = data.data;
+                if (Array.isArray(rawData)) {
+                    console.log("Migration format V1 -> V2 (Steps)");
+                    setSteps([{ id: 'init', name: 'Setup', data: rawData }]);
+                    setCurrentStepIndex(0);
+                } else if (rawData && rawData.steps) {
+                    setSteps(rawData.steps);
+                    setCurrentStepIndex(rawData.currentStepIndex || 0);
                 }
             }
             setIsLoaded(true);
@@ -109,71 +175,74 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         loadInitialData();
     }, [strategyId]);
 
-    // --- 3. INTEGRATION DU REALTIME ---
-    const { processPendingUpdates } = useRealtimeStrategy(
-        strategyId,
-        setDrawings,
-        isRemoteUpdate,
-        isInteractingRef
-    );
+    // --- REALTIME ---
+    useEffect(() => {
+        if (!strategyId) return;
+        const channel = supabase.channel(`room-${strategyId}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'strategies', filter: `id=eq.${strategyId}` },
+                (payload) => {
+                    const newData = payload.new.data;
+                    if (newData) {
+                        if (isInteractingRef.current) {
+                            // Buffer logic placeholder
+                        } else {
+                            isRemoteUpdate.current = true;
+                            if (Array.isArray(newData)) {
+                                setSteps(prev => {
+                                    const newSteps = [...prev];
+                                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newData };
+                                    return newSteps;
+                                });
+                            } else if (newData.steps) {
+                                setSteps(newData.steps);
+                            }
+                        }
+                    }
+                })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [strategyId, currentStepIndex]);
 
     // --- AUTO-SAVE ---
     const debouncedSave = useMemo(
-        () => debounce((id: string, data: any[]) => {
-            updateStrategyData(id, data);
+        () => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
+            const payload = {
+                steps: stepsData,
+                currentStepIndex: idx
+            };
+            updateStrategyData(id, payload as any);
         }, 1000),
         [updateStrategyData]
     );
 
     useEffect(() => {
         if (!isLoaded || !strategyId) return;
+        if (isRemoteUpdate.current) { isRemoteUpdate.current = false; return; }
 
-        // --- 4. PROTECTION BOUCLE INFINIE ---
-        // Si la mise à jour vient du serveur, on ne la renvoie pas
-        if (isRemoteUpdate.current) {
-            isRemoteUpdate.current = false;
-            return;
-        }
-
-        debouncedSave(strategyId, drawings);
+        debouncedSave(strategyId, steps, currentStepIndex);
         return () => debouncedSave.cancel();
-    }, [drawings, strategyId, isLoaded, debouncedSave]);
+    }, [steps, currentStepIndex, strategyId, isLoaded, debouncedSave]);
 
-    // --- CHANGEMENT DE DOSSIER ---
+    // --- HANDLERS ---
     const handleFolderChange = async (newFolderId: string) => {
         setCurrentFolderId(newFolderId);
         if (strategyId) {
-            await supabase
-                .from('strategies')
-                .update({ folder_id: newFolderId || null })
-                .eq('id', strategyId);
+            await supabase.from('strategies').update({ folder_id: newFolderId || null }).eq('id', strategyId);
         }
     };
 
-    // --- LOGIQUE DE SUPPRESSION ---
-    const handleDeleteRequest = () => {
-        setShowDeleteModal(true);
-    };
+    const handleDeleteRequest = () => setShowDeleteModal(true);
 
     const confirmDelete = async () => {
         if (!strategyId) return;
-
-        const { error } = await supabase
-            .from('strategies')
-            .delete()
-            .eq('id', strategyId);
-
-        if (!error) {
-            navigate('/');
-        } else {
-            console.error("Erreur suppression:", error);
-        }
+        const { error } = await supabase.from('strategies').delete().eq('id', strategyId);
+        if (!error) navigate('/');
+        else console.error("Erreur suppression:", error);
     };
 
-    // --- TEXTE ---
     useEffect(() => { if (currentTool === 'text') setIsTextModalOpen(true); }, [currentTool]);
 
-    // --- CANVAS HELPERS & RENDERING ---
+    // --- RENDERING HELPERS ---
     const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => canvasRef.current?.getContext('2d');
 
     const redrawMainCanvas = useCallback(() => {
@@ -211,7 +280,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         return () => { img.removeEventListener('load', onLoad); resizeObserver.disconnect(); };
     }, [syncCanvasSize]);
 
-    // --- SOURIS & INTERACTION ---
     const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
 
     const getMousePos = (e: React.MouseEvent) => {
@@ -247,7 +315,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
     const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
         if (editingTextId !== null) {
-            setDrawings(prev => prev.map(obj => obj.id === editingTextId ? { ...obj, text: data.text, color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal', fontStyle: data.isItalic ? 'italic' : 'normal' } : obj));
+            updateDrawings(prev => prev.map(obj => obj.id === editingTextId ? { ...obj, text: data.text, color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal', fontStyle: data.isItalic ? 'italic' : 'normal' } : obj));
             setEditingTextId(null);
         } else if (containerRef.current && imgRef.current) {
             const containerRect = containerRef.current.getBoundingClientRect();
@@ -260,22 +328,17 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                 color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal',
                 fontStyle: data.isItalic ? 'italic' : 'normal', thickness: 0, opacity: 1
             };
-            setDrawings(prev => [...prev, newText]);
+            updateDrawings(prev => [...prev, newText]);
         }
         setIsTextModalOpen(false);
         setCurrentTool('cursor');
     };
 
-    // --- EVENT HANDLERS (MOUSE & DROP) ---
+    // --- INTERACTIONS SOURIS ---
     const handleMouseDown = (e: React.MouseEvent) => {
-        // --- 5. SIGNALER QU'ON INTERAGIT ---
         isInteractingRef.current = true;
 
-        if (e.button === 1) {
-            setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY };
-            if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
-            e.preventDefault(); return;
-        }
+        if (e.button === 1) { setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY }; if(containerRef.current) containerRef.current.style.cursor = 'grabbing'; e.preventDefault(); return; }
         const mapScale = getCurrentScale();
         const pos = getMousePos(e);
 
@@ -307,7 +370,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             setDraggingObjectId(null); return;
         }
         if (currentTool === 'agent') {
-            setDrawings(prev => [...prev, { id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: iconSize, height: iconSize }]);
+            updateDrawings(prev => [...prev, { id: Date.now(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: iconSize, height: iconSize }]);
             return;
         }
         if (currentTool === 'eraser') { setIsDrawing(true); eraseObjectAt(pos.x, pos.y); return; }
@@ -335,7 +398,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         const pos = { x: canvas ? clamp(rawPos.x, 0, canvas.width) : rawPos.x, y: canvas ? clamp(rawPos.y, 0, canvas.height) : rawPos.y };
 
         if (draggingObjectId !== null) {
-            setDrawings(prev => prev.map(obj => {
+            updateDrawings(prev => prev.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
                 if ((obj.tool === 'image' || obj.tool === 'text') && obj.x !== undefined) {
                     let newX = pos.x - dragOffset.x; let newY = pos.y - dragOffset.y;
@@ -374,13 +437,12 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         if (isPanning) {
             setIsPanning(false);
             if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab');
-            // Pas de return ici, on veut exécuter le code de fin d'interaction
         }
         setDraggingObjectId(null); setSpecialDragMode(null); setDragOffset({ x: 0, y: 0 });
         if (isDrawing) {
             setIsDrawing(false);
             if (currentTool === 'pen') {
-                setDrawings(prev => [...prev, {
+                updateDrawings(prev => [...prev, {
                     id: Date.now(), tool: strokeType,
                     points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current],
                     color: color, thickness: thickness, opacity: opacity
@@ -390,15 +452,11 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             }
             pointsRef.current = [];
         }
-
-        // --- 6. FIN D'INTERACTION : ON TRAITE LES UPDATES EN ATTENTE ---
         isInteractingRef.current = false;
-        processPendingUpdates();
     };
 
     const handleMouseLeave = () => {
         handleMouseUp();
-        // Sécurité supplémentaire
         isInteractingRef.current = false;
     };
 
@@ -422,7 +480,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                 if (Math.abs(finalX - obj.x) < 50 && Math.abs(finalY - obj.y!) < fontSize) hit = true;
             } else if (['pen', 'dashed', 'arrow', 'dashed-arrow'].includes(obj.tool)) {
                 if (obj.points.some(p => Math.hypot(p.x - finalX, p.y - finalY) < (obj.thickness || 4) + 10)) hit = true;
-            } else if (obj.tool === 'rect') { hit = true; } // (Hitbox simplifiée ici)
+            } else if (obj.tool === 'rect') { hit = true; }
             else {
                 // @ts-ignore
                 if (checkAbilityHit(pos, obj, mapScale)) hit = true;
@@ -430,7 +488,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
             if (hit) { newDrawings.splice(i, 1); hasDeleted = true; break; }
         }
-        if (hasDeleted) setDrawings(newDrawings);
+        if (hasDeleted) updateDrawings(newDrawings);
     };
 
     const handleDrop = (e: React.DragEvent) => {
@@ -443,13 +501,15 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
             const finalX = (e.clientX - rect.left - x) / scale; const finalY = (e.clientY - rect.top - y) / scale;
             const img = imgRef.current; if (!img) return;
             const newObj = createDrawingFromDrop(type, name, clamp(finalX, 0, img.clientWidth), clamp(finalY, 0, img.clientHeight));
-            if (newObj) { setDrawings(prev => [...prev, newObj]); setCurrentTool('cursor'); }
+            if (newObj) { updateDrawings(prev => [...prev, newObj]); setCurrentTool('cursor'); }
         } catch (err) { console.error("Drop error", err); }
     };
 
+    // CORRECTION DES TYPES ICI
     const eraseObjectAt = (x: number, y: number) => {
         const eraserRadius = thickness / 2;
-        const newDrawings = drawings.filter(obj => {
+        // On type explicitement 'obj'
+        const newDrawings = drawings.filter((obj: DrawingObject) => {
             const erasableTypes = ['solid', 'dashed', 'arrow', 'dashed-arrow', 'rect', 'pen'];
             if (!erasableTypes.includes(obj.tool as string)) return true;
             if (obj.tool === 'rect' && obj.points.length >= 2) {
@@ -458,12 +518,13 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                 const minY = Math.min(s.y, e.y) - eraserRadius; const maxY = Math.max(s.y, e.y) + eraserRadius;
                 return !(x >= minX && x <= maxX && y >= minY && y <= maxY);
             }
-            return !obj.points.some(p => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + eraserRadius));
+            // On type explicitement 'p'
+            return !obj.points.some((p: {x: number, y: number}) => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + eraserRadius));
         });
-        if (newDrawings.length !== drawings.length) setDrawings(newDrawings);
+        if (newDrawings.length !== drawings.length) updateDrawings(newDrawings);
     };
 
-    const handleLoadStrategy = (strat: any) => { if (strat && strat.data) setDrawings(strat.data); setShowLoadModal(false); };
+    const handleLoadStrategy = (strat: any) => { if (strat && strat.data) updateDrawings(strat.data); setShowLoadModal(false); };
     const getCursorStyle = () => {
         if (isPanning) return 'grabbing';
         if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') return 'default';
@@ -506,7 +567,16 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     <canvas ref={tempCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
                 </div>
 
-                {/* MODALES */}
+                <StepsBar
+                    steps={steps}
+                    currentIndex={currentStepIndex}
+                    onStepChange={setCurrentStepIndex}
+                    onAddStep={handleAddStep}
+                    onDuplicateStep={handleDuplicateStep}
+                    onDeleteStep={handleDeleteStep}
+                    onRenameStep={handleRenameStep}
+                />
+
                 <LoadModal isOpen={showLoadModal} onClose={() => setShowLoadModal(false)} isLoading={isLoading} strategies={savedStrategies} onLoadStrategy={handleLoadStrategy} />
 
                 <TextEditorModal
