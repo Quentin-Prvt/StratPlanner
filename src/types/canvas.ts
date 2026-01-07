@@ -35,7 +35,6 @@ export interface DrawingObject {
     thickness: number;
     opacity: number;
 
-    // Pour les images / icons
     imageSrc?: string;
     x?: number;
     y?: number;
@@ -43,7 +42,6 @@ export interface DrawingObject {
     height?: number;
     rotation?: number;
 
-    // NOUVEAU : Pour le texte
     text?: string;
     fontSize?: number;
     fontWeight?: string;
