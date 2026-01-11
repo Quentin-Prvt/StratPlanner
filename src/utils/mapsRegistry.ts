@@ -2,7 +2,7 @@
 // SVGs are preferred, but use PNG if SVG is missing or broken
 import ascentMap from '../assets/maps/ascent.svg';
 import bindMap from '../assets/maps/bind.svg';
-import breezeMap from '../assets/maps/breeze.svg';
+import breezeMap from '../assets/maps/breeze.png';
 import corrodeMap from '../assets/maps/corrode.svg';
 import fractureMap from '../assets/maps/fracture.svg';
 import havenMap from '../assets/maps/haven.svg';
@@ -21,12 +21,12 @@ export interface MapConfig {
 export const MAP_CONFIGS: Record<string, MapConfig> = {
     ascent:   { src: ascentMap,   scale: 1 },
     bind:     { src: bindMap,     scale: 0.813 },
-    breeze:   { src: breezeMap,   scale: 0.92 },
+    breeze:   { src: breezeMap,   scale: 0.90 },
     fracture: { src: fractureMap, scale: 1.089 },
     haven:    { src: havenMap,    scale: 1.14 },
     icebox:   { src: iceboxMap,   scale: 1.093 },
     lotus:    { src: lotusMap,    scale: 1.075  },
-    pearl:    { src: pearlMap,    scale: 0.96 },
+    pearl:    { src: pearlMap,    scale: 1 },
     split:    { src: splitMap,    scale: 1.08 },
     sunset:   { src: sunsetMap,   scale: 1.02 },
     abyss:    { src: abyssMap,    scale: 0.97},

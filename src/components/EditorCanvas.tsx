@@ -617,7 +617,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
     // Logic for displaying the background image and calls
     const showReverseImage = isRotated && reverseMapSrc && !reverseMapError;
-    const showReverseCalls = isRotated && reverseCallsMapSrc;
+    //const showReverseCalls = isRotated && reverseCallsMapSrc;
 
     return (
         <div className="flex flex-col lg:flex-row h-full w-full bg-[#121212]">
