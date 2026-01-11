@@ -24,9 +24,6 @@ export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingOb
 
     // --- COULEURS ---
     const agentHex = getAgentColor('cypher');
-    // Encore une fois, Cypher est souvent associé au Cyan tech (#22d3ee)
-    // Si agentColors donne du gris, on peut utiliser le gris, ou forcer du cyan si tu préfères.
-    // Ici j'utilise agentHex pour la cohérence.
     const techColor = agentHex;
 
     ctx.save();
@@ -36,9 +33,9 @@ export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.strokeStyle = techColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 4;
     ctx.shadowColor = techColor;
-    ctx.shadowBlur = 8;
+
     ctx.stroke();
 
     ctx.shadowBlur = 0;
@@ -56,7 +53,7 @@ export const drawCypherTrapwire = (ctx: CanvasRenderingContext2D, obj: DrawingOb
     ctx.fillStyle = techColor; // Plein
     ctx.fill();
     ctx.strokeStyle = '#ffffff'; // Contour blanc pour le contraste
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 4;
     ctx.stroke();
 
     // Petit point central

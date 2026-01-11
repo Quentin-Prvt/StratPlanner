@@ -4,7 +4,7 @@
 export const AGENT_COLORS: Record<string, string> = {
     // Sentinelles
     killjoy: '#facc15', // Jaune
-    cypher: '#9ca3af',  // Gris/Blanc
+    cypher: '#ffffff',  // Gris/Blanc
     sage: '#22d3ee',    // Cyan/Jade
     chamber: '#eab308', // Or
     deadlock: '#38bdf8',// Bleu Tech

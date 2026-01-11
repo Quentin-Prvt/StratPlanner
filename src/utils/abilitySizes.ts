@@ -10,9 +10,9 @@ export const ABILITY_SIZES: Record<string, number> = {
     'breach_e_width': 40,
     'breach_e_max_length': 280,
     'breach_e_gap': 42,
-    'breach_x_width': 84,        // Largeur du rectangle 135
-    'breach_x_gap': 42,          // Espace avant le début du rectangle 66
-    'breach_x_fixed_length': 200, // Longueur FIXE totale (gap inclus) 305
+    'breach_x_width': 135,        // Largeur du rectangle 135
+    'breach_x_gap': 66,          // Espace avant le début du rectangle 66
+    'breach_x_fixed_length': 305, // Longueur FIXE totale (gap inclus) 305
 
     // ASTRA
     'astra_c': 90, 'astra_q': 70, 'astra_e': 80,
@@ -42,7 +42,7 @@ export const ABILITY_SIZES: Record<string, number> = {
     'deadlock_x': 30,
 
     // FADE
-    'fade_c': 30, 'fade_x_width': 110, 'fade_x_length': 200,
+    'fade_c': 30, 'fade_x_width': 150, 'fade_x_length': 320,
     'fade_q_radius': 50, 'fade_q_icon_size': 20,
     'fade_e_radius': 215, 'fade_e_icon_size': 20,
 
