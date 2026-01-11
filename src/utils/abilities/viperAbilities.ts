@@ -81,8 +81,8 @@ export const updateViperPosition = (
     if (mode === 'rotate') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
-            x: p1.x + Math.cos(angle) * length,
-            y: p1.y + Math.sin(angle) * length
+            x: p1.x + Math.cos(angle) * length / 3,
+            y: p1.y + Math.sin(angle) * length / 3
         };
         return { ...obj, points: [p1, newP2] };
     }

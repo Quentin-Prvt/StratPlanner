@@ -115,7 +115,7 @@ export const ABILITY_SIZES: Record<string, number> = {
 
     // VIPER
     'viper_c': 80, 'viper_q': 80, 'viper_x': 160,
-    'viper_e_length': 750, 'viper_e_width': 10,
+    'viper_e_length': 500, 'viper_e_width': 10,
     'viper_x_vertex_radius': 5,'viper_x_vertex_hit_radius':10,
 
     // VYSE
