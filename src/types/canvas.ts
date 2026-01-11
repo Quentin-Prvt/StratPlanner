@@ -1,4 +1,3 @@
-
 export type ToolType = 'pen' | 'eraser' | 'cursor' | 'image' | 'text' | string ;
 
 export type StrokeType =
@@ -30,6 +29,8 @@ export interface DrawingObject {
     id: number;
     tool: ToolType;
     subtype?: string; // 'agent', 'ability', 'icon'
+    lineType?: StrokeType;
+
     points: { x: number; y: number }[];
     color: string;
     thickness: number;

@@ -58,10 +58,6 @@ export const renderDrawings = (
         // --- A. TEXTE ---
         if (obj.tool === 'text' && obj.text && obj.x !== undefined && obj.y !== undefined) {
             ctx.save();
-
-            // --- FIX TYPESCRIPT ---
-            // On capture les valeurs ici. TypeScript saura que ce sont des 'number' (pas undefined)
-            // et cette information sera conservée à l'intérieur du forEach.
             const textX = obj.x;
             const textY = obj.y;
 
@@ -73,15 +69,11 @@ export const renderDrawings = (
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            // Gestion du multilingue
             const lines = obj.text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
-
-            // Calcul du Y de départ basé sur textY
             let startY = textY - (totalHeight / 2) + (lineHeight / 2);
 
-            // Ombre portée pour lisibilité
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
             ctx.lineWidth = 3;
@@ -89,34 +81,24 @@ export const renderDrawings = (
 
             lines.forEach((line, index) => {
                 const lineY = startY + (index * lineHeight);
-
-
                 ctx.strokeText(line, textX, lineY);
-
-                // Texte couleur
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = obj.color;
                 ctx.fillText(line, textX, lineY);
-
-                // Rétablir l'ombre
                 ctx.shadowBlur = 4;
             });
 
-            // Cadre de sélection
             if (draggingObjectId === obj.id) {
                 let maxWidth = 0;
                 lines.forEach(line => {
                     const metrics = ctx.measureText(line);
                     if (metrics.width > maxWidth) maxWidth = metrics.width;
                 });
-
                 const width = maxWidth + 20;
                 const height = totalHeight + 20;
-
                 ctx.strokeStyle = '#22c55e';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([5, 5]);
-                // Utilise textX / textY ici aussi
                 ctx.strokeRect(textX - width/2, textY - height/2, width, height);
             }
             ctx.restore();
@@ -143,17 +125,8 @@ export const renderDrawings = (
         if (obj.tool === 'harbor_x_zone') {drawHarborUlt(ctx, obj, mapScale); return; }
         if (['iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); return; }
         if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { drawKayoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-
-        // KILLJOY (J'ai laissé l'ordre standard ici, modifie si besoin selon tes définitions)
-        if (obj.tool === 'killjoy_c_zone' || obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') {
-            drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale);
-            return;
-        }
-        if (obj.tool === 'killjoy_e_turret') {
-            drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, showZones,  mapScale);
-            return;
-        }
-
+        if (obj.tool === 'killjoy_c_zone' || obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') { drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
+        if (obj.tool === 'killjoy_e_turret') { drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, showZones,  mapScale); return; }
         if (obj.tool === 'neon_c_wall') { drawNeonWall(ctx, obj, mapScale); return; }
         if (obj.tool === 'neon_q_zone') { drawNeonStun(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
         if (obj.tool === 'omen_q_zone') { drawOmenParanoia(ctx, obj, mapScale); return; }
@@ -183,7 +156,6 @@ export const renderDrawings = (
             }
 
             if (img && img.complete && img.naturalWidth > 0) {
-
                 let baseSize = obj.width || 50;
                 const isAgent = obj.subtype === 'agent';
                 const isAbilityIcon = obj.subtype === 'ability' && (obj.imageSrc.includes('_icon') || !obj.imageSrc.includes('_game'));
@@ -251,24 +223,40 @@ export const renderDrawings = (
             return;
         }
 
-        // --- D. DESSIN VECTORIEL STANDARD ---
+        // --- D. DESSIN VECTORIEL STANDARD (CRAYON) FIXÉ ---
         ctx.strokeStyle = obj.color;
         ctx.lineWidth = obj.thickness;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        if (obj.tool === 'dashed' || obj.tool === 'dashed-arrow') ctx.setLineDash([obj.thickness * 2, obj.thickness * 2]);
-        else ctx.setLineDash([]);
+        // 1. Détection du style : On regarde lineType ET tool (pour compatibilité)
+        const style = obj.lineType || obj.tool;
 
-        if (obj.tool === 'rect') {
-            const start = obj.points[0]; const end = obj.points[1];
+        const isDashed = style.includes('dashed');
+        const isArrow = style.includes('arrow');
+        const isRect = style === 'rect';
+
+        if (isDashed) {
+            ctx.setLineDash([obj.thickness * 2, obj.thickness * 2]);
+        } else {
+            ctx.setLineDash([]);
+        }
+
+        if (isRect && obj.points.length > 1) {
+            const start = obj.points[0];
+            const end = obj.points[1];
             ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
         } else {
-            drawSmoothLine(ctx, obj.points);
-            if ((obj.tool === 'arrow' || obj.tool === 'dashed-arrow') && obj.points.length > 2) {
-                const last = obj.points[obj.points.length - 1];
-                const prev = obj.points[Math.max(0, obj.points.length - 5)];
-                if(prev && last) drawArrowHead(ctx, prev.x, prev.y, last.x, last.y, obj.thickness);
+            // Dessin du trait
+            if (obj.points.length > 0) {
+                drawSmoothLine(ctx, obj.points);
+
+                // Dessin de la flèche
+                if (isArrow && obj.points.length > 2) {
+                    const last = obj.points[obj.points.length - 1];
+                    const prev = obj.points[Math.max(0, obj.points.length - 5)];
+                    if(prev && last) drawArrowHead(ctx, prev.x, prev.y, last.x, last.y, obj.thickness);
+                }
             }
         }
     });
