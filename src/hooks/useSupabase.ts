@@ -8,7 +8,7 @@ export interface Folder {
     id: number;
     name: string;
     user_id: string;
-    team_id: string | null; // Nouveau
+    team_id: string | null;
     created_at: string;
 }
 
@@ -18,7 +18,7 @@ export interface Strategy {
     map_name: string;
     user_id: string;
     folder_id: number | null;
-    team_id: string | null; // Nouveau
+    team_id: string | null;
     data: DrawingObject[];
     created_at: string;
     updated_at: string;
@@ -69,18 +69,23 @@ export const useSupabaseStrategies = () => {
         return data;
     };
 
-    // Ajout de teamId lors de la création
-    const createNewStrategy = async (mapName: string, title: string, teamId: string | null = null) => {
+    // --- MODIFICATION ICI : Ajout de folderId ---
+    const createNewStrategy = async (
+        mapName: string,
+        title: string,
+        teamId: string | null = null,
+        folderId: number | null = null // <--- NOUVEL ARGUMENT
+    ) => {
         if (!user) return null;
 
         const payload = {
             user_id: user.id,
             map_name: mapName,
             title: title,
-            name: title, // Rétrocompatibilité si 'name' existe encore
+            name: title, // Rétrocompatibilité
             data: [],
-            folder_id: null,
-            team_id: teamId || null // Important : null si pas de team
+            folder_id: folderId || null, // <--- ENREGISTREMENT DU DOSSIER
+            team_id: teamId || null
         };
 
         const { data, error } = await supabase
@@ -130,7 +135,6 @@ export const useSupabaseStrategies = () => {
 
     // --- FOLDERS ---
 
-    // Accepte un teamId optionnel pour filtrer
     const fetchFolders = useCallback(async (teamId: string | null = null) => {
         if (!user) return;
 
@@ -140,10 +144,8 @@ export const useSupabaseStrategies = () => {
             .order('name');
 
         if (teamId) {
-            // MODE ÉQUIPE
             query = query.eq('team_id', teamId);
         } else {
-            // MODE PERSO
             query = query.eq('user_id', user.id).is('team_id', null);
         }
 
@@ -153,7 +155,6 @@ export const useSupabaseStrategies = () => {
         if (data) setFolders(data);
     }, [user]);
 
-    // Ajout de teamId lors de la création
     const createFolder = async (name: string, teamId: string | null = null) => {
         if (!user) return;
 
@@ -179,7 +180,6 @@ export const useSupabaseStrategies = () => {
             .eq('id', id);
 
         if (!error) {
-            // Mise à jour locale pour éviter un re-fetch complet
             setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
         } else {
             console.error("Erreur rename folder:", error);
@@ -194,7 +194,6 @@ export const useSupabaseStrategies = () => {
 
         if (!error) {
             setFolders(prev => prev.filter(f => f.id !== id));
-            // Mettre à jour les strats orphelines localement
             setSavedStrategies(prev => prev.map(s =>
                 s.folder_id === id ? { ...s, folder_id: null } : s
             ));

@@ -6,7 +6,7 @@ import { MAP_CONFIGS } from '../utils/mapsRegistry';
 import {
     FolderPlus, Trash2, Plus, Folder as FolderIcon,
     FolderOpen, Map as MapIcon, User, Users, ShieldAlert,
-    AlertTriangle, X, Edit2 // <--- Ajout de Edit2
+    AlertTriangle, X, Edit2
 } from 'lucide-react';
 
 type WorkspaceMode = 'personal' | 'team';
@@ -19,7 +19,7 @@ export const Dashboard = () => {
     const {
         savedStrategies, folders, isLoading: strategiesLoading,
         fetchStrategies, fetchFolders, deleteStrategy, createFolder, deleteFolder, moveStrategy,
-        renameFolder // <--- Récupération de la nouvelle fonction
+        renameFolder
     } = useSupabaseStrategies();
 
     // --- STATE ---
@@ -30,7 +30,7 @@ export const Dashboard = () => {
     const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
 
-    // Modal Renommage Dossier (NOUVEAU)
+    // Modal Renommage Dossier
     const [renameModal, setRenameModal] = useState<{ isOpen: boolean; folderId: number | null; name: string }>({
         isOpen: false,
         folderId: null,
@@ -63,12 +63,19 @@ export const Dashboard = () => {
 
     // --- HANDLERS ---
 
+    // --- FIX: AJOUT DU FOLDER ID DANS L'URL ---
     const handleCreateStrategy = () => {
+        const params = new URLSearchParams();
+
         if (workspaceMode === 'team' && team) {
-            navigate(`/create?teamId=${team.id}`);
-        } else {
-            navigate('/create');
+            params.append('teamId', team.id);
         }
+
+        if (currentFolderId !== null) {
+            params.append('folderId', currentFolderId.toString());
+        }
+
+        navigate(`/create?${params.toString()}`);
     };
 
     const handleCreateFolder = async (e: React.FormEvent) => {
@@ -81,9 +88,8 @@ export const Dashboard = () => {
         }
     };
 
-    // Handler Renommage (NOUVEAU)
     const openRenameModal = (e: React.MouseEvent, folder: Folder) => {
-        e.stopPropagation(); // Empêche d'ouvrir le dossier quand on clique sur edit
+        e.stopPropagation();
         setRenameModal({ isOpen: true, folderId: folder.id, name: folder.name });
     };
 

@@ -7,7 +7,11 @@ import { ArrowLeft, Check } from 'lucide-react';
 export const MapSelector = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+
+
     const teamId = searchParams.get('teamId');
+    const folderParam = searchParams.get('folderId');
+    const folderId = folderParam ? parseInt(folderParam, 10) : null;
 
     const { createNewStrategy } = useSupabaseStrategies();
 
@@ -20,7 +24,10 @@ export const MapSelector = () => {
         if (!selectedMap || !title.trim()) return;
 
         setIsCreating(true);
-        const newStrat = await createNewStrategy(selectedMap, title, teamId);
+
+        // 2. On passe le folderId à la fonction de création
+        // (Assurez-vous que votre hook useSupabaseStrategies accepte ce 4ème argument, voir plus bas)
+        const newStrat = await createNewStrategy(selectedMap, title, teamId, folderId);
 
         if (newStrat) {
             navigate(`/editor/${newStrat.id}`);
@@ -31,7 +38,6 @@ export const MapSelector = () => {
     };
 
     return (
-        // Remplacement de h-screen par h-full pour s'adapter au conteneur parent
         <div className="flex flex-col h-full bg-[#121212] text-white overflow-hidden font-sans">
 
             {/* HEADER (Fixe) */}
@@ -48,15 +54,13 @@ export const MapSelector = () => {
             {/* CONTENU (Scrollable avec Scrollbar Custom) */}
             <div className="
                 flex-1 overflow-y-auto p-6
-                /* Classes pour la Scrollbar Custom */
                 [&::-webkit-scrollbar]:w-2
                 [&::-webkit-scrollbar-track]:bg-transparent
                 [&::-webkit-scrollbar-thumb]:bg-gray-700
                 [&::-webkit-scrollbar-thumb]:rounded-full
                 [&::-webkit-scrollbar-thumb]:hover:bg-gray-600
-                /* Fin Scrollbar Custom */
             ">
-                <div className="max-w-7xl mx-auto space-y-8 pb-32"> {/* Padding bas large pour le footer */}
+                <div className="max-w-7xl mx-auto space-y-8 pb-32">
 
                     {/* Input Titre */}
                     <div className="bg-[#1e2327] p-6 rounded-xl border border-gray-800 shadow-sm">
