@@ -302,13 +302,12 @@ export const useEditorLogic = (strategyId: string) => {
 
         const currentScale = transformRef.current.scale;
         const isMinZoom = currentScale <= 0.501; // Petite marge de sécurité pour les flottants
-
-        // 1. GESTION DU PAN EXPLICITE (Molette ou Clic)
         const isMiddleClick = e.button === 1;
         const isLeftClick = e.button === 0;
 
-        // ON BLOQUE LE PAN SI ON EST DÉZOOMÉ AU MAX (!isMinZoom)
-        if ((isMiddleClick || (isLeftClick)) && !isMinZoom) {
+        // 1. PRIORITÉ ABSOLUE : PAN via CLIC MOLETTE (Toujours possible sauf si min zoom)
+        // On sépare le clic molette car lui doit toujours pan, peu importe ce qu'il y a dessous
+        if (isMiddleClick && !isMinZoom) {
             setIsPanning(true);
             panStartRef.current = { x: e.clientX, y: e.clientY };
             if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
@@ -319,35 +318,48 @@ export const useEditorLogic = (strategyId: string) => {
         const mapScale = getCurrentScale();
         const pos = getMousePos(e);
 
-        // 2. DETECTION DES OBJETS
+        // 2. DETECTION DES OBJETS (Seulement si outil Cursor/Settings/Tools)
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
+
+            // On vérifie d'abord si on clique sur un objet
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
-                // ... (Vérifications Hit Text / Image / Ability inchangées) ...
+
+                // Detection Text
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
                     if (Math.abs(pos.x - obj.x) < approxWidth/2 && Math.abs(pos.y - obj.y) < fontSize/2) {
-                        setDraggingObjectId(obj.id); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
+                        setDraggingObjectId(obj.id);
+                        setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y });
+                        return; // <--- IMPORTANT : On sort si on a trouvé un objet
                     }
                 }
+
+                // Detection Image / Agent
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = (obj.width || iconSize) * mapScale; const h = (obj.height || iconSize) * mapScale;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
-                        setDraggingObjectId(obj.id); setSpecialDragMode(null); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
+                        setDraggingObjectId(obj.id);
+                        setSpecialDragMode(null);
+                        setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y });
+                        return; // <--- IMPORTANT : On sort si on a trouvé un objet
                     }
                 }
+
+                // Detection Ability
                 // @ts-ignore
                 const hit = checkAbilityHit(pos, obj, mapScale);
                 if (hit) {
-                    setDraggingObjectId(hit.id); setSpecialDragMode(hit.mode);
+                    setDraggingObjectId(hit.id);
+                    setSpecialDragMode(hit.mode);
                     if (hit.offset) setDragOffset(hit.offset);
                     if (hit.centerStart) setWallCenterStart(hit.centerStart);
-                    return;
+                    return; // <--- IMPORTANT : On sort si on a trouvé un objet
                 }
             }
 
-            // 3. CLIC DANS LE VIDE -> PAN (Seulement si pas zoom min)
+            // 3. SI AUCUN OBJET TROUVÉ -> ALORS ON PAN (Si Clic Gauche + Zoomé)
             setDraggingObjectId(null);
 
             if (isLeftClick && !isMinZoom) {
