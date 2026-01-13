@@ -46,7 +46,8 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         handleContextMenu, handleDrop, handleDoubleClick,
 
         // Actions
-        handleClearAll, handleSaveText, handleLoadStrategy,
+        handleClearAll, handleClearAgents, handleClearAbilities, handleClearText, handleClearDrawings,
+        handleSaveText, handleLoadStrategy,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
         handleFolderChange, handleDeleteRequest, confirmDelete, fetchStrategies
     } = useEditorLogic(strategyId);
@@ -72,6 +73,10 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     onFolderChange={handleFolderChange}
                     onDeleteStrategy={handleDeleteRequest}
                     onClearAll={handleClearAll}
+                    onClearAgents={handleClearAgents}
+                    onClearAbilities={handleClearAbilities}
+                    onClearText={handleClearText}
+                    onClearDrawings={handleClearDrawings}
                     isRotated={isRotated} setIsRotated={setIsRotated}
                     showMapCalls={showMapCalls} setShowMapCalls={setShowMapCalls}
                 />

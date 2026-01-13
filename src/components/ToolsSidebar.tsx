@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Pencil, Eraser, Minus, MoveUpRight, ArrowBigRightDash, Square,
     Hand, MousePointer2, Settings, Hammer, Type, Trash2, FolderOpen, RefreshCcw,
-    RotateCw, MessageSquareText
+    RotateCw, MessageSquareText, UserX, ZapOff, XCircle
 } from 'lucide-react';
 
 import type { ToolType, StrokeType } from '../types/canvas';
@@ -38,6 +38,11 @@ interface ToolsSidebarProps {
 
     // Actions
     onClearAll: () => void;
+    onClearAgents: () => void;
+    onClearAbilities: () => void;
+    onClearText: () => void;
+    onClearDrawings: () => void;
+
     folders: { id: string, name: string }[];
     currentFolderId: string;
     onFolderChange: (folderId: string) => void;
@@ -55,11 +60,18 @@ export const ToolsSidebar = ({
                                  showMapCalls, setShowMapCalls,
                                  iconSize, setIconSize,
                                  isRotated, setIsRotated,
+
+                                 // Actions de nettoyage
                                  onClearAll,
+                                 onClearAgents,
+                                 onClearAbilities,
+                                 onClearText,
+                                 onClearDrawings,
+
                                  folders, currentFolderId, onFolderChange, onDeleteStrategy
                              }: ToolsSidebarProps) => {
 
-    const [confirmClear, setConfirmClear] = useState(false);
+    const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
     const colors = ['#ffffff', '#000000', '#ef4444', '#ec4899', '#facc15', '#84cc16', '#14532d', '#3b82f6', '#8b5cf6', '#713f12'];
     const agents = ['astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock', 'fade', 'gekko', 'harbor', 'iso', 'jett', 'kayo', 'killjoy', 'neon', 'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova','tejo','veto', 'viper', 'vyse','waylay', 'yoru'];
@@ -71,13 +83,13 @@ export const ToolsSidebar = ({
     const activateEraser = () => { setTool('eraser'); setThickness(30); };
     const isDrawingMode = currentTool === 'pen' || currentTool === 'eraser';
 
-    const handleClearClick = () => {
-        if (confirmClear) {
-            onClearAll();
-            setConfirmClear(false);
+    const handleSafeAction = (target: string, action: () => void) => {
+        if (confirmTarget === target) {
+            action();
+            setConfirmTarget(null);
         } else {
-            setConfirmClear(true);
-            setTimeout(() => setConfirmClear(false), 3000);
+            setConfirmTarget(target);
+            setTimeout(() => setConfirmTarget(prev => prev === target ? null : prev), 3000);
         }
     };
 
@@ -88,8 +100,27 @@ export const ToolsSidebar = ({
         if (type === 'agent') setSelectedAgent(name);
     };
 
+    const getDeleteButtonStyle = (targetName: string) => {
+        const isConfirming = confirmTarget === targetName;
+        return `flex items-center justify-center gap-2 p-2 rounded text-xs transition-all duration-200 border ${
+            isConfirming
+                ? 'bg-orange-600 hover:bg-orange-700 text-white border-orange-500 animate-pulse font-bold'
+                : 'bg-slate-700 hover:bg-slate-600 text-gray-300 border-transparent hover:border-slate-500'
+        }`;
+    };
+
     return (
-        <div className="flex flex-col gap-4 p-4 bg-[#1e293b] rounded-xl border border-gray-700 shadow-xl w-full lg:w-72 text-white overflow-y-auto max-h-full pointer-events-auto">
+        <div className="
+            flex flex-col gap-4 p-4 bg-[#1e293b] rounded-xl border border-gray-700 shadow-xl w-full lg:w-72 text-white
+            overflow-y-auto max-h-full pointer-events-auto
+
+            {/* --- SCROLLBAR STYLE COPIÉ DU MAPSELECTOR --- */}
+            [&::-webkit-scrollbar]:w-2
+            [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:bg-gray-700
+            [&::-webkit-scrollbar-thumb]:rounded-full
+            [&::-webkit-scrollbar-thumb]:hover:bg-gray-600
+        ">
 
             {/* HEADER + ROTATION */}
             <div className="flex justify-between items-center mb-1">
@@ -165,20 +196,102 @@ export const ToolsSidebar = ({
 
                     <div className="flex flex-col gap-2 pt-2 border-t border-gray-700"><div className="flex justify-between items-center text-gray-400 text-xs uppercase font-bold"><span>Taille Icônes</span><span className="text-white">{iconSize}px</span></div><input type="range" min="20" max="60" step="2" value={iconSize} onChange={(e) => setIconSize(parseInt(e.target.value))} className="w-full h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-500" /></div>
 
+                    {/* NETTOYAGE RAPIDE */}
+                    <div className="flex flex-col gap-2 pt-2 border-t border-gray-700">
+                        <span className="text-xs font-bold uppercase text-gray-500 mb-1">Nettoyage Rapide</span>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => handleSafeAction('agents', onClearAgents)}
+                                className={getDeleteButtonStyle('agents')}
+                                title="Supprimer tous les agents"
+                            >
+                                <UserX size={14} />
+                                {confirmTarget === 'agents' ? "Confirmer ?" : "Agents"}
+                            </button>
+
+                            <button
+                                onClick={() => handleSafeAction('abilities', onClearAbilities)}
+                                className={getDeleteButtonStyle('abilities')}
+                                title="Supprimer tous les sorts"
+                            >
+                                <ZapOff size={14} />
+                                {confirmTarget === 'abilities' ? "Confirmer ?" : "Sorts"}
+                            </button>
+
+                            <button
+                                onClick={() => handleSafeAction('drawings', onClearDrawings)}
+                                className={getDeleteButtonStyle('drawings')}
+                                title="Supprimer tous les dessins"
+                            >
+                                <Pencil size={14} />
+                                {confirmTarget === 'drawings' ? "Confirmer ?" : "Dessins"}
+                            </button>
+
+                            <button
+                                onClick={() => handleSafeAction('text', onClearText)}
+                                className={getDeleteButtonStyle('text')}
+                                title="Supprimer tous les textes"
+                            >
+                                <Type size={14} />
+                                {confirmTarget === 'text' ? "Confirmer ?" : "Textes"}
+                            </button>
+                        </div>
+
+                        {/* BOUTON TOUT EFFACER PRINCIPAL */}
+                        <button
+                            onClick={() => handleSafeAction('all', onClearAll)}
+                            className={`flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-xs transition-all mt-1 border ${
+                                confirmTarget === 'all'
+                                    ? 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse border-orange-500'
+                                    : 'bg-red-900/30 border-red-900/50 hover:bg-red-900/50 text-red-200'
+                            }`}
+                        >
+                            {confirmTarget === 'all' ? <RefreshCcw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            {confirmTarget === 'all' ? "CONFIRMER TOUT EFFACER ?" : "Tout effacer (Reset)"}
+                        </button>
+                    </div>
+
                     {/* ORGANISATION */}
                     <div className="flex flex-col gap-3 pt-2 border-t border-gray-700">
                         <span className="text-sm font-medium text-gray-400 pb-1">Organisation</span>
                         <div className="flex flex-col gap-1.5"><label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2"><FolderOpen size={12} /> Dossier</label><select value={currentFolderId} onChange={(e) => onFolderChange(e.target.value)} className="w-full bg-slate-900 text-white text-sm rounded-lg border border-slate-700 p-2 focus:ring-2 focus:ring-blue-500 outline-none hover:bg-slate-800"><option value="">Aucun dossier</option>{folders.map((folder) => (<option key={folder.id} value={folder.id}>{folder.name}</option>))}</select></div>
 
-                        <button onClick={handleClearClick} className={`flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-sm transition-all mt-2 ${confirmClear ? 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}><RefreshCcw size={16} className={confirmClear ? "animate-spin" : ""} />{confirmClear ? "Confirmer l'effacement ?" : "Tout effacer sur la carte"}</button>
-                        <button onClick={onDeleteStrategy} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-red-900/20"><Trash2 size={16} /> Supprimer la stratégie</button>
+                        <button onClick={onDeleteStrategy} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-red-900/20 mt-2"><XCircle size={16} /> Supprimer la stratégie</button>
                     </div>
                 </div>
             )}
 
-            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-300 mt-2"><span className="text-sm font-medium text-gray-400">Compétences ({selectedAgent})</span><div className="grid grid-cols-4 gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">{abilities.map(key => (<div key={key} draggable onDragStart={(e) => handleDragStart(e, 'ability', `${selectedAgent}_${key}`)} className="aspect-square p-1 rounded-md border border-slate-600 hover:border-white hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-all flex items-center justify-center relative group" title={`Compétence ${key.toUpperCase()}`}><img src={`/abilities/${selectedAgent}_${key}_icon.png`} alt={key} className="w-full h-full object-contain pointer-events-none" onError={(e) => {e.currentTarget.src = 'https://placehold.co/40x40/black/white?text=?'}} /><span className="absolute bottom-0 right-0 bg-black/70 text-[10px] px-1 rounded text-white font-mono">{key.toUpperCase()}</span></div>))}</div></div>
-            <div className="flex flex-col gap-2 flex-1 min-h-0"><span className="text-sm font-medium text-gray-400">Agents</span><div className="grid grid-cols-4 gap-2 bg-slate-800 p-3 rounded-lg border border-slate-700 overflow-y-auto custom-scrollbar">{agents.map(agent => (<div key={agent} draggable={true} onDragStart={(e) => handleDragStart(e, 'agent', agent)} onClick={() => { setSelectedAgent(agent); setTool('agent'); }} className={`aspect-square p-1 rounded-md border-2 cursor-grab active:cursor-grabbing transition-all ${selectedAgent === agent ? 'border-[#ff4655] bg-slate-700' : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700'}`}><img src={`/agents/${agent}.png`} alt={agent} className="w-full h-full object-contain pointer-events-none" onError={(e) => {e.currentTarget.src = 'https://placehold.co/40x40/black/white?text=?'}} /></div>))}</div></div>
-        </div>
+            <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-300 mt-2">
+                <span className="text-sm font-medium text-gray-400">Compétences ({selectedAgent})</span>
+                <div className="grid grid-cols-4 gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
+                    {abilities.map(key => (
+                        <div key={key} draggable onDragStart={(e) => handleDragStart(e, 'ability', `${selectedAgent}_${key}`)} className="aspect-square p-1 rounded-md border border-slate-600 hover:border-white hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-all flex items-center justify-center relative group" title={`Compétence ${key.toUpperCase()}`}>
+                            <img src={`/abilities/${selectedAgent}_${key}_icon.png`} alt={key} className="w-full h-full object-contain pointer-events-none" onError={(e) => {e.currentTarget.src = 'https://placehold.co/40x40/black/white?text=?'}} />
+                            <span className="absolute bottom-0 right-0 bg-black/70 text-[10px] px-1 rounded text-white font-mono">{key.toUpperCase()}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Section Agents */}
+            <div className="flex flex-col gap-2 flex-1 min-h-0">
+                <span className="text-sm font-medium text-gray-400">Agents</span>
+                <div className="
+                    grid grid-cols-4 gap-2 bg-slate-800 p-3 rounded-lg border border-slate-700 overflow-y-auto
+                    [&::-webkit-scrollbar]:w-2
+                    [&::-webkit-scrollbar-track]:bg-transparent
+                    [&::-webkit-scrollbar-thumb]:bg-gray-700
+                    [&::-webkit-scrollbar-thumb]:rounded-full
+                    [&::-webkit-scrollbar-thumb]:hover:bg-gray-600
+                ">
+                    {agents.map(agent => (
+                        <div key={agent} draggable={true} onDragStart={(e) => handleDragStart(e, 'agent', agent)} onClick={() => { setSelectedAgent(agent); setTool('agent'); }} className={`aspect-square p-1 rounded-md border-2 cursor-grab active:cursor-grabbing transition-all ${selectedAgent === agent ? 'border-[#ff4655] bg-slate-700' : 'border-slate-600 hover:border-slate-500 hover:bg-slate-700'}`}>
+                            <img src={`/agents/${agent}.png`} alt={agent} className="w-full h-full object-contain pointer-events-none" onError={(e) => {e.currentTarget.src = 'https://placehold.co/40x40/black/white?text=?'}} />
+                        </div>
+                    ))}
+                </div>
+            </div></div>
     );
 };
 

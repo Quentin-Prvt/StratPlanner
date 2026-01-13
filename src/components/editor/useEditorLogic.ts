@@ -15,7 +15,7 @@ import type { DrawingObject, ToolType, StrokeType, StrategyStep } from '../../ty
 // Helper ID
 const generateId = () => Date.now() + Math.random();
 
-// --- MATH HELPERS POUR LA DETECTION DE CLIC ---
+// --- MATH HELPERS ---
 function distanceToSegment(p: {x: number, y: number}, v: {x: number, y: number}, w: {x: number, y: number}) {
     const l2 = (v.x - w.x) * (v.x - w.x) + (v.y - w.y) * (v.y - w.y);
     if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
@@ -55,31 +55,25 @@ export const useEditorLogic = (strategyId: string) => {
     // --- STATES ---
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentMapSrc, setCurrentMapSrc] = useState<string | null>(null);
-
     const [isRotated, setIsRotated] = useState(false);
     const [showMapCalls, setShowMapCalls] = useState(true);
     const [reverseMapError, setReverseMapError] = useState(false);
     const [reverseCallsError, setReverseCallsError] = useState(false);
-
     const [steps, setSteps] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [] }]);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
-
     const [showZones, setShowZones] = useState(true);
     const [iconSize, setIconSize] = useState(30);
     const [folders, setFolders] = useState<{id: string, name: string}[]>([]);
     const [currentFolderId, setCurrentFolderId] = useState<string>("");
-
     const [isTextModalOpen, setIsTextModalOpen] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingTextId, setEditingTextId] = useState<number | null>(null);
-
     const [currentTool, setCurrentTool] = useState<ToolType | 'tools' | 'settings' | 'text' | null>('cursor');
     const [strokeType, setStrokeType] = useState<StrokeType>('solid');
     const [color, setColor] = useState('#ef4444');
     const [opacity, setOpacity] = useState(1);
     const [thickness, setThickness] = useState(4);
     const [selectedAgent, setSelectedAgent] = useState('jett');
-
     const [isDrawing, setIsDrawing] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
     const [draggingObjectId, setDraggingObjectId] = useState<number | null>(null);
@@ -94,15 +88,15 @@ export const useEditorLogic = (strategyId: string) => {
         return entry ? entry[1].scale : 1.0;
     };
 
-    // Synchro State -> Ref
+    const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
+
+    // --- EFFECTS ---
     useEffect(() => {
         if (steps[currentStepIndex]) {
             drawingsRef.current = steps[currentStepIndex].data;
             redrawMainCanvas();
         }
     }, [steps, currentStepIndex]);
-
-    const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
 
     useEffect(() => {
         setReverseMapError(false);
@@ -126,26 +120,14 @@ export const useEditorLogic = (strategyId: string) => {
     }, [currentMapSrc]);
 
     // --- DATA HANDLING ---
-    const updateDrawingsState = useCallback((action: React.SetStateAction<DrawingObject[]>) => {
-        setSteps(prevSteps => {
-            const newSteps = [...prevSteps];
-            if (!newSteps[currentStepIndex]) return prevSteps;
-
-            const currentData = newSteps[currentStepIndex].data;
-            const newData = typeof action === 'function' ? (action as (prev: DrawingObject[]) => DrawingObject[])(currentData) : action;
-
-            newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newData };
-            drawingsRef.current = newData;
-            return newSteps;
-        });
-    }, [currentStepIndex]);
-
     const immediateSave = (stepsData: StrategyStep[], idx: number = currentStepIndex) => {
         if (!strategyId) return;
+        // console.log(`💾 [SAVE] Saving ${stepsData[idx].data.length} items to DB.`);
         updateStrategyData(strategyId, { steps: stepsData, currentStepIndex: idx } as any);
     };
 
     const debouncedSave = useMemo(() => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
+        // console.log("⏱️ [DEBOUNCE SAVE] Firing...");
         updateStrategyData(id, { steps: stepsData, currentStepIndex: idx } as any);
     }, 1000), [updateStrategyData]);
 
@@ -187,7 +169,11 @@ export const useEditorLogic = (strategyId: string) => {
     useRealtimeStrategy(
         strategyId,
         (newDrawings: any) => {
-            if (isInteractingRef.current) return;
+            if (isInteractingRef.current) {
+                // console.log("🛡️ [REALTIME] Blocked (User Interaction)");
+                return;
+            }
+
             if (Array.isArray(newDrawings)) {
                 setSteps(prev => {
                     const newSteps = [...prev];
@@ -204,11 +190,16 @@ export const useEditorLogic = (strategyId: string) => {
         isInteractingRef
     );
 
-    // --- AUTO-SAVE ---
+    // --- AUTO-SAVE EFFECT ---
     useEffect(() => {
         if (!isLoaded || !strategyId) return;
         if (isRemoteUpdate.current) { isRemoteUpdate.current = false; return; }
         if (isInteractingRef.current) return;
+
+        // Debounce save pour les changements mineurs non capturés ailleurs
+        // (mais la plupart des actions utilisent maintenant immediateSave)
+        debouncedSave(strategyId, steps, currentStepIndex);
+
         return () => debouncedSave.cancel();
     }, [steps, currentStepIndex, strategyId, isLoaded, debouncedSave]);
 
@@ -234,7 +225,6 @@ export const useEditorLogic = (strategyId: string) => {
     const eraseObjectAt = (x: number, y: number) => {
         const eraserRadius = thickness / 2;
         const newDrawings = drawingsRef.current.filter((obj: DrawingObject) => {
-            // Logique gomme (inchangée pour l'instant, mais pourrait bénéficier de distanceToSegment aussi)
             const erasableTypes = ['solid', 'dashed', 'arrow', 'dashed-arrow', 'rect', 'pen'];
             if (obj.tool === 'pen') return !obj.points.some((p: {x: number, y: number}) => Math.hypot(p.x - x, p.y - y) < (obj.thickness / 2 + eraserRadius));
             if (!erasableTypes.includes(obj.tool as string)) return true;
@@ -249,11 +239,21 @@ export const useEditorLogic = (strategyId: string) => {
 
         if (newDrawings.length !== drawingsRef.current.length) {
             drawingsRef.current = newDrawings;
-            updateDrawingsState(newDrawings);
+            // Update State & DB
+            setSteps(prev => {
+                const newSteps = [...prev];
+                if (newSteps[currentStepIndex]) {
+                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newDrawings };
+                }
+                debouncedSave.cancel();
+                immediateSave(newSteps);
+                return newSteps;
+            });
             redrawMainCanvas();
         }
     };
 
+    // --- RENDER LOOP ---
     const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => canvasRef.current?.getContext('2d');
 
     const redrawMainCanvas = useCallback(() => {
@@ -311,7 +311,6 @@ export const useEditorLogic = (strategyId: string) => {
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
-                // Hit text
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
@@ -319,14 +318,12 @@ export const useEditorLogic = (strategyId: string) => {
                         setDraggingObjectId(obj.id); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
-                // Hit image/icon
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = (obj.width || iconSize) * mapScale; const h = (obj.height || iconSize) * mapScale;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
                         setDraggingObjectId(obj.id); setSpecialDragMode(null); setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y }); return;
                     }
                 }
-                // Hit ability
                 // @ts-ignore
                 const hit = checkAbilityHit(pos, obj, mapScale);
                 if (hit) {
@@ -341,11 +338,18 @@ export const useEditorLogic = (strategyId: string) => {
 
         if (currentTool === 'agent') {
             const newObj: DrawingObject = { id: generateId(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: iconSize, height: iconSize };
-            const newList = [...drawingsRef.current, newObj];
-            drawingsRef.current = newList;
-            updateDrawingsState(newList);
-            const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: newList } : s);
-            immediateSave(newSteps);
+            drawingsRef.current = [...drawingsRef.current, newObj];
+            redrawMainCanvas();
+
+            setSteps(prev => {
+                const newSteps = [...prev];
+                if (newSteps[currentStepIndex]) {
+                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: drawingsRef.current };
+                }
+                debouncedSave.cancel();
+                immediateSave(newSteps);
+                return newSteps;
+            });
             return;
         }
         if (currentTool === 'eraser') { setIsDrawing(true); eraseObjectAt(pos.x, pos.y); return; }
@@ -382,6 +386,7 @@ export const useEditorLogic = (strategyId: string) => {
         const pos = { x: canvas ? clamp(rawPos.x, 0, canvas.width) : rawPos.x, y: canvas ? clamp(rawPos.y, 0, canvas.height) : rawPos.y };
 
         if (draggingObjectId !== null) {
+            // OPTIMISATION: Update local REF uniquement pendant le drag
             const updatedList = drawingsRef.current.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
                 if ((obj.tool === 'image' || obj.tool === 'text') && obj.x !== undefined) {
@@ -420,12 +425,21 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleMouseUp = () => {
+        // --- CAS 1: POUBELLE ---
         if (draggingObjectId !== null && isOverTrash) {
             const updatedDrawings = drawingsRef.current.filter(obj => obj.id !== draggingObjectId);
             drawingsRef.current = updatedDrawings;
-            updateDrawingsState(updatedDrawings);
-            const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: updatedDrawings } : s);
-            immediateSave(newSteps);
+            // Sync React et DB de manière sécurisée
+            setSteps(prev => {
+                const newSteps = [...prev];
+                if (newSteps[currentStepIndex]) {
+                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: updatedDrawings };
+                }
+                debouncedSave.cancel();
+                immediateSave(newSteps);
+                return newSteps;
+            });
+
             setIsOverTrash(false);
             setDraggingObjectId(null);
             setSpecialDragMode(null);
@@ -435,11 +449,18 @@ export const useEditorLogic = (strategyId: string) => {
             return;
         }
 
+        // --- CAS 2: FIN DRAG ---
         if (draggingObjectId !== null) {
             const finalData = [...drawingsRef.current];
-            updateDrawingsState(finalData);
-            const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: finalData } : s);
-            immediateSave(newSteps);
+            setSteps(prev => {
+                const newSteps = [...prev];
+                if (newSteps[currentStepIndex]) {
+                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: finalData };
+                }
+                debouncedSave.cancel();
+                immediateSave(newSteps);
+                return newSteps;
+            });
         }
 
         if (isPanning) {
@@ -463,11 +484,17 @@ export const useEditorLogic = (strategyId: string) => {
                         thickness: thickness,
                         opacity: opacity
                     };
-                    const newList = [...drawingsRef.current, newPenObject];
-                    drawingsRef.current = newList;
-                    updateDrawingsState(newList);
-                    const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: newList } : s);
-                    immediateSave(newSteps);
+                    drawingsRef.current = [...drawingsRef.current, newPenObject];
+
+                    setSteps(prev => {
+                        const newSteps = [...prev];
+                        if (newSteps[currentStepIndex]) {
+                            newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: drawingsRef.current };
+                        }
+                        debouncedSave.cancel();
+                        immediateSave(newSteps);
+                        return newSteps;
+                    });
                 }
                 const tempCtx = getContext(tempCanvasRef);
                 if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
@@ -486,18 +513,61 @@ export const useEditorLogic = (strategyId: string) => {
 
     const handleClearAll = () => {
         drawingsRef.current = [];
-        updateDrawingsState([]);
-        setCurrentTool('cursor');
         redrawMainCanvas();
+        setCurrentTool('cursor');
+
         if(strategyId) {
-            const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: [] } : s);
-            immediateSave(newSteps, currentStepIndex);
+            setSteps(prevSteps => {
+                const newSteps = prevSteps.map((s, i) =>
+                    i === currentStepIndex ? { ...s, data: [] } : s
+                );
+                debouncedSave.cancel();
+                immediateSave(newSteps, currentStepIndex);
+                return newSteps;
+            });
         }
     };
 
-    // --- CONTEXT MENU (CLIC DROIT) AMÉLIORÉ ---
+    const handleClearType = (typeFilter: (obj: DrawingObject) => boolean) => {
+        const newDrawings = drawingsRef.current.filter(obj => !typeFilter(obj));
+
+        drawingsRef.current = newDrawings;
+        redrawMainCanvas();
+
+        if(strategyId) {
+            setSteps(prevSteps => {
+                const newSteps = prevSteps.map((s, i) =>
+                    i === currentStepIndex ? { ...s, data: newDrawings } : s
+                );
+                debouncedSave.cancel();
+                immediateSave(newSteps, currentStepIndex);
+                return newSteps;
+            });
+        }
+    };
+    const handleClearAgents = () => handleClearType(obj => obj.tool === 'image' && obj.subtype === 'agent');
+    const handleClearAbilities = () => handleClearType(obj =>
+        // Soit c'est une image de type 'ability', soit c'est un outil vectoriel qui n'est ni image, ni texte, ni crayon de base
+        (obj.tool === 'image' && obj.subtype === 'ability') ||
+        (!['image', 'text', 'pen', 'rect'].includes(obj.tool as string) && !obj.lineType) // lineType check pour les vieux dessins
+    );
+    const handleClearText = () => handleClearType(obj => obj.tool === 'text');
+    const handleClearDrawings = () => handleClearType(obj =>
+        ['pen', 'dashed', 'arrow', 'dashed-arrow', 'rect'].includes(obj.tool as string) ||
+        (obj.tool === 'pen') // Check tool 'pen' générique
+    );
+
+    const getCursorStyle = () => {
+        if (isPanning) return 'grabbing';
+        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') return 'default';
+        if (currentTool === 'eraser') return 'crosshair';
+        return 'crosshair';
+    };
+
+    // --- CONTEXT MENU (CLIC DROIT) ---
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
+
         const pos = getMousePos(e);
         const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
         const finalX = pos.x;
@@ -506,59 +576,45 @@ export const useEditorLogic = (strategyId: string) => {
         const currentList = [...drawingsRef.current];
         let hasDeleted = false;
         const mapScale = getCurrentScale();
+        const HIT_TOLERANCE = 15;
 
-        // On boucle à l'envers pour supprimer l'élément le plus haut en Z
         for (let i = currentList.length - 1; i >= 0; i--) {
             const obj = currentList[i];
             let hit = false;
 
-            // 1. Detection IMAGES / AGENTS / ICONES (Box un peu plus large)
+            // Detection IMAGES / AGENTS / ICONES
             if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                 const w = (obj.width || iconSize) * mapScale;
                 const h = (obj.height || iconSize) * mapScale;
-                // Marge de 5px pour faciliter le clic
-                if (finalX >= obj.x - w/2 - 5 && finalX <= obj.x + w/2 + 5 &&
-                    finalY >= obj.y - h/2 - 5 && finalY <= obj.y + h/2 + 5) {
-                    hit = true;
-                }
+                if (finalX >= obj.x - w/2 - HIT_TOLERANCE && finalX <= obj.x + w/2 + HIT_TOLERANCE &&
+                    finalY >= obj.y - h/2 - HIT_TOLERANCE && finalY <= obj.y + h/2 + HIT_TOLERANCE) hit = true;
             }
-            // 2. Detection TEXTE (Estimation plus précise)
+            // Detection TEXTE
             else if (obj.tool === 'text' && obj.x != null) {
-                const fontSize = obj.fontSize || 20;
-                // Estimation largeur : nbr caractères * taille * ratio (~0.6)
-                const textWidth = (obj.text?.length || 5) * fontSize * 0.6;
-                // Box centrée sur obj.x/y
-                if (Math.abs(finalX - obj.x) < (textWidth / 2) + 10 &&
-                    Math.abs(finalY - obj.y!) < (fontSize / 2) + 10) {
-                    hit = true;
-                }
+                const fontSize = (obj.fontSize || 20) * mapScale;
+                const textWidth = (obj.text?.length || 1) * fontSize * 0.7 + 20;
+                const textHeight = fontSize + 20;
+                if (Math.abs(finalX - obj.x) < (textWidth / 2) && Math.abs(finalY - obj.y!) < (textHeight / 2)) hit = true;
             }
-            // 3. Detection TRAITS (PEN) - Algorithme Distance Segment
+            // Detection TRAITS (PEN)
             else if (['pen', 'dashed', 'arrow', 'dashed-arrow'].includes(obj.tool as string) || obj.tool === 'pen') {
-                // On vérifie si un segment est proche de la souris (tolerance 15px)
+                const tolerance = (obj.thickness || 4) + 20;
                 const hitLine = obj.points.some((p, idx) => {
-                    if (idx === 0) return false; // Besoin de 2 points pour un segment
+                    if (idx === 0) return false;
                     const prev = obj.points[idx - 1];
-                    const dist = distanceToSegment(pos, prev, p);
-                    return dist < (obj.thickness || 4) + 15; // Tolérance généreuse
+                    return Math.hypot(p.x - finalX, p.y - finalY) < tolerance || distanceToSegment(pos, prev, p) < tolerance;
                 });
                 if (hitLine) hit = true;
             }
-            // 4. Detection RECTANGLE (Bords)
+            // Detection RECT
             else if (obj.tool === 'rect' && obj.points.length > 1) {
-                const p1 = obj.points[0];
-                const p2 = obj.points[1];
-                // Vérifie si on est proche des 4 côtés
-                const minX = Math.min(p1.x, p2.x) - 10;
-                const maxX = Math.max(p1.x, p2.x) + 10;
-                const minY = Math.min(p1.y, p2.y) - 10;
-                const maxY = Math.max(p1.y, p2.y) + 10;
-                // Clic à l'intérieur ou sur le bord
-                if(finalX >= minX && finalX <= maxX && finalY >= minY && finalY <= maxY) {
-                    hit = true;
-                }
+                const p1 = obj.points[0]; const p2 = obj.points[1];
+                const margin = 10;
+                const minX = Math.min(p1.x, p2.x) - margin; const maxX = Math.max(p1.x, p2.x) + margin;
+                const minY = Math.min(p1.y, p2.y) - margin; const maxY = Math.max(p1.y, p2.y) + margin;
+                if(finalX >= minX && finalX <= maxX && finalY >= minY && finalY <= maxY) hit = true;
             }
-            // 5. Detection ABILITES (Vectorielles)
+            // Detection ABILITIES
             else {
                 // @ts-ignore
                 if (checkAbilityHit(pos, obj, mapScale)) hit = true;
@@ -567,19 +623,32 @@ export const useEditorLogic = (strategyId: string) => {
             if (hit) {
                 currentList.splice(i, 1);
                 hasDeleted = true;
-                break; // On supprime un seul élément à la fois (le plus haut)
+                break;
             }
         }
 
         if (hasDeleted) {
+            // A. Mise à jour Visuelle Immédiate (via Ref)
             drawingsRef.current = currentList;
-            updateDrawingsState(currentList);
             redrawMainCanvas();
-            const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: currentList } : s);
-            immediateSave(newSteps);
+
+            // B. Mise à jour de la Base de Données (via State sécurisé)
+            setSteps(prevSteps => {
+                const newSteps = [...prevSteps];
+                if (newSteps[currentStepIndex]) {
+                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: currentList };
+                }
+
+                debouncedSave.cancel();
+                immediateSave(newSteps);
+
+                return newSteps;
+            });
         }
     };
 
+    // ... (Reste des fonctions inchangées : handleDrop, handleSaveText, step actions...)
+    // --- DROP ---
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const jsonData = e.dataTransfer.getData("application/json"); if (!jsonData) return;
@@ -590,24 +659,26 @@ export const useEditorLogic = (strategyId: string) => {
             const finalX = clamp(x, 0, img.clientWidth);
             const finalY = clamp(y, 0, img.clientHeight);
             const newObj = createDrawingFromDrop(type, name, finalX, finalY);
+
             if (newObj) {
                 newObj.id = generateId();
+
                 const newList = [...drawingsRef.current, newObj];
                 drawingsRef.current = newList;
-                updateDrawingsState(newList);
 
                 setCurrentTool('cursor');
-                const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: newList } : s);
-                immediateSave(newSteps);
+
+                setSteps(prevSteps => {
+                    const newSteps = [...prevSteps];
+                    if (newSteps[currentStepIndex]) {
+                        newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newList };
+                    }
+                    debouncedSave.cancel();
+                    immediateSave(newSteps);
+                    return newSteps;
+                });
             }
         } catch (err) { console.error("Drop error", err); }
-    };
-
-    const getCursorStyle = () => {
-        if (isPanning) return 'grabbing';
-        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') return 'default';
-        if (currentTool === 'eraser') return 'crosshair';
-        return 'crosshair';
     };
 
     const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
@@ -637,9 +708,15 @@ export const useEditorLogic = (strategyId: string) => {
         }
 
         drawingsRef.current = currentList;
-        updateDrawingsState(currentList);
-        const newSteps = steps.map((s, i) => i === currentStepIndex ? { ...s, data: currentList } : s);
-        immediateSave(newSteps);
+        setSteps(prevSteps => {
+            const newSteps = [...prevSteps];
+            if (newSteps[currentStepIndex]) {
+                newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: currentList };
+            }
+            debouncedSave.cancel();
+            immediateSave(newSteps);
+            return newSteps;
+        });
 
         setIsTextModalOpen(false);
         setCurrentTool('cursor');
@@ -663,44 +740,54 @@ export const useEditorLogic = (strategyId: string) => {
 
     // --- STEP ACTIONS ---
     const handleAddStep = () => {
-        const newSteps = [...steps, { id: generateId().toString(), name: `Phase ${steps.length + 1}`, data: [] }];
-        setSteps(newSteps);
-        setCurrentStepIndex(prev => prev + 1);
-        immediateSave(newSteps, steps.length);
+        setSteps(prevSteps => {
+            const newSteps = [...prevSteps, { id: generateId().toString(), name: `Phase ${prevSteps.length + 1}`, data: [] }];
+            const newIndex = prevSteps.length;
+            immediateSave(newSteps, newIndex);
+            setCurrentStepIndex(newIndex);
+            return newSteps;
+        });
     };
 
     const handleDuplicateStep = () => {
-        const currentStep = steps[currentStepIndex];
-        const clonedData = JSON.parse(JSON.stringify(currentStep.data));
-        const newStep = {
-            id: generateId().toString(),
-            name: `${currentStep.name} (Copy)`,
-            data: clonedData
-        };
-        setSteps(prev => {
-            const newSteps = [...prev];
+        setSteps(prevSteps => {
+            const currentStep = prevSteps[currentStepIndex];
+            const clonedData = JSON.parse(JSON.stringify(currentStep.data));
+            const newStep = {
+                id: generateId().toString(),
+                name: `${currentStep.name} (Copy)`,
+                data: clonedData
+            };
+            const newSteps = [...prevSteps];
             newSteps.splice(currentStepIndex + 1, 0, newStep);
+
+            const newIndex = currentStepIndex + 1;
+            immediateSave(newSteps, newIndex);
+            setCurrentStepIndex(newIndex);
             return newSteps;
         });
-        setCurrentStepIndex(prev => prev + 1);
-        const newSteps = [...steps];
-        newSteps.splice(currentStepIndex + 1, 0, newStep);
-        immediateSave(newSteps, currentStepIndex + 1);
     };
 
     const handleDeleteStep = (index: number) => {
         if (steps.length <= 1) return;
-        const newSteps = steps.filter((_, i) => i !== index);
-        setSteps(newSteps);
-        const newIndex = currentStepIndex >= index && currentStepIndex > 0 ? currentStepIndex - 1 : currentStepIndex;
-        setCurrentStepIndex(newIndex);
-        immediateSave(newSteps, newIndex);
+        setSteps(prevSteps => {
+            const newSteps = prevSteps.filter((_, i) => i !== index);
+            let newIndex = currentStepIndex;
+            if (currentStepIndex >= index && currentStepIndex > 0) {
+                newIndex = currentStepIndex - 1;
+            }
+            immediateSave(newSteps, newIndex);
+            setCurrentStepIndex(newIndex);
+            return newSteps;
+        });
     };
 
     const handleRenameStep = (index: number, newName: string) => {
-        const newSteps = steps.map((s, i) => i === index ? { ...s, name: newName } : s);
-        setSteps(newSteps);
-        immediateSave(newSteps, currentStepIndex);
+        setSteps(prevSteps => {
+            const newSteps = prevSteps.map((s, i) => i === index ? { ...s, name: newName } : s);
+            immediateSave(newSteps, currentStepIndex);
+            return newSteps;
+        });
     };
 
     // --- FILE ACTIONS ---
@@ -762,9 +849,10 @@ export const useEditorLogic = (strategyId: string) => {
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave,
         handleContextMenu, handleDrop, handleDoubleClick,
 
-        handleClearAll, handleSaveText, handleLoadStrategy,
+        handleClearAll, handleClearAgents, handleClearAbilities, handleClearText, handleClearDrawings,
+        handleSaveText, handleLoadStrategy,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
         handleFolderChange, handleDeleteRequest: () => setShowDeleteModal(true), confirmDelete,
-        fetchStrategies
+        fetchStrategies,
     };
 };
