@@ -15,8 +15,7 @@ export const drawOmenParanoia = (ctx: CanvasRenderingContext2D, obj: DrawingObje
 
     // --- COULEURS ---
     const agentHex = getAgentColor('omen'); // Indigo/Violet (#6366f1)
-    // Pour Omen, on veut un effet sombre "ombre"
-    // On peut utiliser la couleur agent mais assombrie ou avec plus d'opacité
+
     const zoneColor = hexToRgba(agentHex, 0.5);
     const strokeColor = '#8b5cf6'; // Violet un peu plus clair pour le contour
 
@@ -26,9 +25,7 @@ export const drawOmenParanoia = (ctx: CanvasRenderingContext2D, obj: DrawingObje
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
-    // Ombre portée
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = agentHex;
+
 
     // Fond
     ctx.fillStyle = zoneColor;

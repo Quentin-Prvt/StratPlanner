@@ -223,25 +223,26 @@ export const renderDrawings = (
             return;
         }
 
-        // --- D. DESSIN VECTORIEL STANDARD (CRAYON) FIXÉ ---
+        // --- D. DESSIN VECTORIEL ---
         ctx.strokeStyle = obj.color;
         ctx.lineWidth = obj.thickness;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // 1. Détection du style : On regarde lineType ET tool (pour compatibilité)
         const style = obj.lineType || obj.tool;
 
         const isDashed = style.includes('dashed');
         const isArrow = style.includes('arrow');
         const isRect = style === 'rect';
 
+        // Application des pointillés
         if (isDashed) {
             ctx.setLineDash([obj.thickness * 2, obj.thickness * 2]);
         } else {
             ctx.setLineDash([]);
         }
 
+        //  Dessiner la forme
         if (isRect && obj.points.length > 1) {
             const start = obj.points[0];
             const end = obj.points[1];
@@ -251,11 +252,16 @@ export const renderDrawings = (
             if (obj.points.length > 0) {
                 drawSmoothLine(ctx, obj.points);
 
-                // Dessin de la flèche
+                // Dessin de la flèche à la fin
                 if (isArrow && obj.points.length > 2) {
                     const last = obj.points[obj.points.length - 1];
-                    const prev = obj.points[Math.max(0, obj.points.length - 5)];
-                    if(prev && last) drawArrowHead(ctx, prev.x, prev.y, last.x, last.y, obj.thickness);
+                    // On recule un peu pour trouver l'angle de la pointe
+                    const prevIndex = Math.max(0, obj.points.length - 5);
+                    const prev = obj.points[prevIndex];
+
+                    if (prev && last) {
+                        drawArrowHead(ctx, prev.x, prev.y, last.x, last.y, obj.thickness);
+                    }
                 }
             }
         }

@@ -21,7 +21,7 @@ export interface MapConfig {
 export const MAP_CONFIGS: Record<string, MapConfig> = {
     ascent:   { src: ascentMap,   scale: 1 },
     bind:     { src: bindMap,     scale: 0.813 },
-    breeze:   { src: breezeMap,   scale: 0.90 },
+    breeze:   { src: breezeMap,   scale: 0.95 },
     fracture: { src: fractureMap, scale: 1.089 },
     haven:    { src: havenMap,    scale: 1.14 },
     icebox:   { src: iceboxMap,   scale: 1.093 },

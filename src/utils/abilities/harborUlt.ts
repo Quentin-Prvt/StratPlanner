@@ -12,7 +12,8 @@ export const drawHarborUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
 
     const width = (ABILITY_SIZES['harbor_x_width'] || 250) * mapScale;
     const fixedLength = (ABILITY_SIZES['harbor_x_length'] || 470) * mapScale;
-    const gap = 0;
+    // Ajout du gap (défaut à 0 si non défini dans abilitySizes)
+    const gap = (ABILITY_SIZES['harbor_x_gap'] || 0) * mapScale;
 
     // --- COULEURS ---
     const agentHex = getAgentColor('harbor'); // Cyan Eau (#06b6d4)
@@ -22,6 +23,7 @@ export const drawHarborUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const angle = Math.atan2(dy, dx);
+
     const rectLength = Math.max(0, fixedLength - gap);
 
     ctx.save();
@@ -30,22 +32,22 @@ export const drawHarborUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     ctx.translate(p1.x, p1.y);
     ctx.rotate(angle);
 
-    if (rectLength > 0) {
-        ctx.fillStyle = zoneColor;
-        ctx.beginPath();
-        // @ts-ignore
-        ctx.rect(gap, -width / 2, rectLength, width);
-        ctx.fill();
+    // Dessin du rectangle de la zone
+    // On commence à x=gap et on dessine le reste
+    ctx.fillStyle = zoneColor;
+    ctx.beginPath();
+    ctx.rect(gap, -width / 2, rectLength, width);
+    ctx.fill();
 
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 3;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-        ctx.stroke();
-    }
     ctx.restore();
 
+    // --- HANDLES (Points de contrôle) ---
 
-    // A. Origine
+    // A. Origine (p1)
     ctx.beginPath();
     ctx.fillStyle = 'white';
     ctx.strokeStyle = agentHex;
@@ -54,13 +56,21 @@ export const drawHarborUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     ctx.fill();
     ctx.stroke();
 
-    // B. Handle
-    ctx.translate(p2.x, p2.y);
-    ctx.rotate(angle + Math.PI / 4);
+    // B. Handle de rotation (p2)
+    const totalVisualLength = gap + rectLength;
+
+    const handleX = p1.x + Math.cos(angle) * totalVisualLength;
+    const handleY = p1.y + Math.sin(angle) * totalVisualLength;
+
+    ctx.save();
+    ctx.translate(handleX, handleY);
+    ctx.rotate(angle + Math.PI / 4); // Rotation pour faire un losange
+
     ctx.fillStyle = agentHex;
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     const diamondSize = 10;
+
     ctx.beginPath();
     ctx.rect(-diamondSize / 2, -diamondSize / 2, diamondSize, diamondSize);
     ctx.fill();
@@ -69,14 +79,27 @@ export const drawHarborUlt = (ctx: CanvasRenderingContext2D, obj: DrawingObject,
     ctx.restore();
 };
 
-// ... check et update inchangés
-export const checkHarborUltHit = (pos: { x: number, y: number }, obj: DrawingObject) => {
+export const checkHarborUltHit = (pos: { x: number, y: number }, obj: DrawingObject, mapScale: number = 1.0) => {
     const p1 = obj.points[0];
     const p2 = obj.points[1];
-    if (Math.hypot(pos.x - p2.x, pos.y - p2.y) < 20) return { mode: 'handle' };
+
+    // On recalcule la position réelle du handle p2 en fonction de la longueur fixe
+    const fixedLength = (ABILITY_SIZES['harbor_x_length'] || 470) * mapScale;
+
+    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+    const realP2 = {
+        x: p1.x + Math.cos(angle) * fixedLength,
+        y: p1.y + Math.sin(angle) * fixedLength
+    };
+
+    // Hit sur le handle de rotation
+    if (Math.hypot(pos.x - realP2.x, pos.y - realP2.y) < 20) return { mode: 'handle' };
+
+    // Hit sur le centre (déplacement)
     if (Math.hypot(pos.x - p1.x, pos.y - p1.y) < 20) {
         return { mode: 'center', offset: { x: pos.x - p1.x, y: pos.y - p1.y } };
     }
+
     return null;
 };
 
@@ -89,6 +112,7 @@ export const updateHarborUltPosition = (
 ): DrawingObject => {
     const p1 = obj.points[0];
     const fixedLength = (ABILITY_SIZES['harbor_x_length'] || 470) * mapScale;
+
     if (mode === 'handle') {
         const angle = Math.atan2(pos.y - p1.y, pos.x - p1.x);
         const newP2 = {
@@ -97,12 +121,18 @@ export const updateHarborUltPosition = (
         };
         return { ...obj, points: [p1, newP2] };
     }
+
     if (mode === 'center') {
+        // On déplace tout le rectangle en gardant l'angle
         const p2 = obj.points[1];
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
+
         const newP1 = { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y };
-        return { ...obj, points: [newP1, { x: newP1.x + dx, y: newP1.y + dy }] };
+        const newP2 = { x: newP1.x + dx, y: newP1.y + dy };
+
+        return { ...obj, points: [newP1, newP2] };
     }
+
     return obj;
 };

@@ -61,8 +61,7 @@ export const checkAbilityHit = (pos: {x: number, y: number}, obj: DrawingObject)
     if (obj.tool === 'fade_q_zone') { const hit = checkFadeSeizeHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'fade_e_zone') { const hit = checkFadeHauntHit(pos, obj); return hit ? { id: obj.id, mode: 'center', offset: hit.offset } : null; }
     if (obj.tool === 'gekko_q_wingman') { const hit = checkGekkoQHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
-    if (obj.tool === 'harbor_x_zone') { const hit = checkHarborUltHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
-    if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { const hit = checkIsoHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
+    if (obj.tool === 'harbor_x_zone') {const hit = checkHarborUltHit(pos, obj, 1.0); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null;}    if (['iso_c_wall', 'iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { const hit = checkIsoHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { const hit = checkKayoHit(pos, obj); return hit ? { id: obj.id, mode: 'center', offset: hit.offset } : null; }
     if (obj.tool.startsWith('killjoy_')) { const hit = checkKilljoyHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }
     if (obj.tool === 'neon_c_wall' || obj.tool === 'neon_q_zone') { const hit = checkNeonHit(pos, obj); return hit ? { id: obj.id, mode: hit.mode, offset: hit.offset } : null; }

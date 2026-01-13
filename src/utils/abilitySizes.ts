@@ -8,12 +8,11 @@ export const ABILITY_SIZES: Record<string, number> = {
     'breach_c_handle_dist': 56,
     'breach_q': 30,
     'breach_e_width': 40,
-    'breach_e_max_length': 280,
-    'breach_e_gap': 42,
-    'breach_x_width': 135,        // Largeur du rectangle 135
-    'breach_x_gap': 66,          // Espace avant le début du rectangle 66
-    'breach_x_fixed_length': 305, // Longueur FIXE totale (gap inclus) 305
-
+    'breach_e_max_length': 375,
+    'breach_e_gap': 60,
+    'breach_x_width': 135,
+    'breach_x_gap': 64,
+    'breach_x_fixed_length': 300,
     // ASTRA
     'astra_c': 90, 'astra_q': 70, 'astra_e': 80,
 
@@ -37,41 +36,41 @@ export const ABILITY_SIZES: Record<string, number> = {
     'cypher_q_radius': 25, 'cypher_e': 20, 'cypher_x': 20,
 
     // DEADLOCK
-    'deadlock_e': 150, 'deadlock_c_radius': 60, 'deadlock_c_node_size': 10, 'deadlock_c_max_length':60,
-    'deadlock_q_length': 50, 'deadlock_q_width': 40, 'deadlock_q_icon_size': 20,
+    'deadlock_e': 110, 'deadlock_c_radius': 60, 'deadlock_c_node_size': 10, 'deadlock_c_max_length':60,
+    'deadlock_q_length': 60, 'deadlock_q_width': 50, 'deadlock_q_icon_size': 20,
     'deadlock_x': 30,
 
     // FADE
-    'fade_c': 30, 'fade_x_width': 150, 'fade_x_length': 320,
+    'fade_c': 30, 'fade_x_width': 150, 'fade_x_length': 300,
     'fade_q_radius': 50, 'fade_q_icon_size': 20,
     'fade_e_radius': 215, 'fade_e_icon_size': 20,
 
     // GEKKO
-    'gekko_c': 75, 'gekko_e': 20, 'gekko_x': 20,
+    'gekko_c': 90, 'gekko_e': 20, 'gekko_x': 20,
     'gekko_q_size': 50, 'gekko_q_handle_dist': 40,
 
     // HARBOR
-    'harbor_c': 100, 'harbor_e': 70,
-    'harbor_x_width': 100,
-    'harbor_x_length': 250,
+    'harbor_c': 110, 'harbor_e': 80,
+    'harbor_x_width': 140,
+    'harbor_x_length': 350, 'harbor_x_gap': 60,
 
     // ISO
     'iso_q_width': 30, 'iso_q_length': 175,
     'iso_e': 20, 'iso_x_width': 70, 'iso_x_length': 185,
 
     // JETT
-    'jett_c': 45, 'jett_q': 20, 'jett_e': 20, 'jett_x': 20,
+    'jett_c': 60, 'jett_q': 20, 'jett_e': 20, 'jett_x': 20,
 
     // KAYO
     'kayo_c': 90, 'kayo_q': 30,
-    'kayo_e_radius': 120, 'kayo_e_icon_size': 20,
-    'kayo_x_radius': 320, 'kayo_x_icon_size': 20,
+    'kayo_e_radius': 110, 'kayo_e_icon_size': 20,
+    'kayo_x_radius': 310, 'kayo_x_icon_size': 20,
 
     // KILLJOY
     'killjoy_c_radius': 35,
-    'killjoy_q_radius': 40, 'killjoy_q_icon_size': 30, 'killjoy_q_detection_radius': 300,
-    'killjoy_e_size': 50, 'killjoy_e_handle_dist': 40, 'killjoy_e_range': 300,
-    'killjoy_x_radius': 243, 'killjoy_x_icon_size': 30,
+    'killjoy_q_radius': 40, 'killjoy_q_icon_size': 30, 'killjoy_q_detection_radius': 290,
+    'killjoy_e_size': 50, 'killjoy_e_handle_dist': 40, 'killjoy_e_range': 290,
+    'killjoy_x_radius': 230, 'killjoy_x_icon_size': 30,
 
     // NEON
     'neon_c_width': 20, 'neon_c_length': 170,

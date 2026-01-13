@@ -1,15 +1,15 @@
-import { useEffect,  useCallback } from 'react';
+import  { useEffect,  useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import type { DrawingObject } from '../types/canvas';
 
 export const useRealtimeStrategy = (
     strategyId: string,
-    setDrawings: React.Dispatch<React.SetStateAction<DrawingObject[]>>,
-    isRemoteUpdate: React.MutableRefObject<boolean>,
-    isInteractingRef: React.MutableRefObject<boolean>
+    setDrawings: React.Dispatch<React.SetStateAction<DrawingObject[]>>, // On passe directement le setter
+    isRemoteUpdate: React.RefObject<boolean>,
+    isInteractingRef: React.RefObject<boolean> // <--- LE BOUCLIER ANTI-CLIGNOTEMENT
 ) => {
 
-    // On simplifie : plus besoin de pendingUpdate complexe
+    // Plus besoin de logique complexe de pendingUpdate ici, le bouclier suffit.
     const processPendingUpdates = useCallback(() => {}, []);
 
     useEffect(() => {
@@ -33,10 +33,11 @@ export const useRealtimeStrategy = (
                     const newData = payload.new.data;
                     if (newData) {
                         isRemoteUpdate.current = true;
+
+                        // Gestion de tes formats de données (array direct ou objet steps)
                         if (Array.isArray(newData)) {
                             setDrawings(newData);
                         } else if (newData.steps) {
-                            // Gestion compatibilité
                             setDrawings(newData);
                         }
                     }

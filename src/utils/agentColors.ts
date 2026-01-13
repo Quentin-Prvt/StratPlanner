@@ -6,7 +6,7 @@ export const AGENT_COLORS: Record<string, string> = {
     killjoy: '#facc15', // Jaune
     cypher: '#ffffff',  // Gris/Blanc
     sage: '#22d3ee',    // Cyan/Jade
-    chamber: '#eab308', // Or
+    chamber: '#472525', // Or
     deadlock: '#38bdf8',// Bleu Tech
     vyse: '#94a3b8',    // Acier/Gris métal
 
@@ -19,7 +19,7 @@ export const AGENT_COLORS: Record<string, string> = {
     clove: '#f472b6',     // Rose
 
     // Initiateurs
-    sova: '#3b82f6',      // Bleu Chasseur
+    sova: '#d6ff83',      // Bleu Chasseur
     breach: '#d97706',    // Orange Terre
     skye: '#84cc16',      // Vert Nature
     kayo: '#60a5fa',      // Bleu Robot
