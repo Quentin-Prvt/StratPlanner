@@ -49,7 +49,7 @@ export const useEditorLogic = (strategyId: string) => {
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
     // --- HOOKS ---
-    const { transformRef, contentRef, updateTransformStyle } = useCanvasZoom(containerRef);
+    const { transformRef, contentRef,  centerView, panCanvas } = useCanvasZoom(containerRef);
     const { savedStrategies, isLoading, showLoadModal, setShowLoadModal, fetchStrategies, getStrategyById, updateStrategyData } = useSupabaseStrategies();
 
     // --- STATES ---
@@ -85,7 +85,7 @@ export const useEditorLogic = (strategyId: string) => {
     // --- COMPUTED ---
     const getCurrentScale = () => {
         const entry = Object.entries(MAP_CONFIGS).find(([_, config]) => config.src === currentMapSrc);
-        return entry ? entry[1].scale : 1.0;
+        return entry ? entry[1].scale : 0.75;
     };
 
     const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
@@ -300,17 +300,30 @@ export const useEditorLogic = (strategyId: string) => {
     const handleMouseDown = (e: React.MouseEvent) => {
         isInteractingRef.current = true;
 
-        if (e.button === 1) {
-            setIsPanning(true); panStartRef.current = { x: e.clientX, y: e.clientY };
+        const currentScale = transformRef.current.scale;
+        const isMinZoom = currentScale <= 0.501; // Petite marge de sécurité pour les flottants
+
+        // 1. GESTION DU PAN EXPLICITE (Molette ou Clic)
+        const isMiddleClick = e.button === 1;
+        const isLeftClick = e.button === 0;
+
+        // ON BLOQUE LE PAN SI ON EST DÉZOOMÉ AU MAX (!isMinZoom)
+        if ((isMiddleClick || (isLeftClick)) && !isMinZoom) {
+            setIsPanning(true);
+            panStartRef.current = { x: e.clientX, y: e.clientY };
             if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
-            e.preventDefault(); return;
+            e.preventDefault();
+            return;
         }
+
         const mapScale = getCurrentScale();
         const pos = getMousePos(e);
 
+        // 2. DETECTION DES OBJETS
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
+                // ... (Vérifications Hit Text / Image / Ability inchangées) ...
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
@@ -333,7 +346,17 @@ export const useEditorLogic = (strategyId: string) => {
                     return;
                 }
             }
-            setDraggingObjectId(null); return;
+
+            // 3. CLIC DANS LE VIDE -> PAN (Seulement si pas zoom min)
+            setDraggingObjectId(null);
+
+            if (isLeftClick && !isMinZoom) {
+                setIsPanning(true);
+                panStartRef.current = { x: e.clientX, y: e.clientY };
+                if(containerRef.current) containerRef.current.style.cursor = 'grabbing';
+                return;
+            }
+            return;
         }
 
         if (currentTool === 'agent') {
@@ -376,10 +399,11 @@ export const useEditorLogic = (strategyId: string) => {
 
         if (isPanning) {
             e.preventDefault();
-            const dx = e.clientX - panStartRef.current.x; const dy = e.clientY - panStartRef.current.y;
-            const { x, y, scale } = transformRef.current;
-            transformRef.current = { scale, x: x + dx, y: y + dy }; updateTransformStyle();
-            panStartRef.current = { x: e.clientX, y: e.clientY }; return;
+            const dx = e.clientX - panStartRef.current.x;
+            const dy = e.clientY - panStartRef.current.y;
+            panCanvas(dx, dy);
+            panStartRef.current = { x: e.clientX, y: e.clientY };
+            return;
         }
         const rawPos = getMousePos(e);
         const canvas = mainCanvasRef.current;
@@ -558,8 +582,17 @@ export const useEditorLogic = (strategyId: string) => {
     );
 
     const getCursorStyle = () => {
+        // Si on est dézoomé au max, curseur par défaut
+        if (transformRef.current.scale <= 0.501) {
+            // Sauf si on survole un outil interactif (gomme, etc), mais pour le pan c'est default
+            if (currentTool === 'cursor') return 'default';
+        }
+
         if (isPanning) return 'grabbing';
-        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') return 'default';
+        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') {
+            // On pourrait ajouter 'grab' ici si on est zoomé, mais 'default' est souvent plus propre
+            return 'default';
+        }
         if (currentTool === 'eraser') return 'crosshair';
         return 'crosshair';
     };
@@ -819,7 +852,7 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     return {
-        mainCanvasRef, tempCanvasRef, containerRef, imgRef, trashRef, contentRef,
+        mainCanvasRef, tempCanvasRef, containerRef, imgRef, trashRef, contentRef, centerView, panCanvas,
 
         drawings: drawingsRef.current,
         steps, currentStepIndex, setCurrentStepIndex,

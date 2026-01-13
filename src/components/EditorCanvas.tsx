@@ -3,18 +3,23 @@ import { LoadModal } from './LoadModal';
 import { ConfirmModal } from './ConfirmModal';
 import { StepsBar } from './StepsBar';
 import { TextEditorModal } from './TextEditorModal';
-import { useEditorLogic } from './editor/useEditorLogic'; // Assure-toi du bon chemin d'import
+import { useEditorLogic } from './editor/useEditorLogic';
 import { Trash2 } from 'lucide-react';
-
 interface EditorCanvasProps {
     strategyId: string;
 }
 
 export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
-    // On récupère toute la logique depuis le hook
+    // 1. Récupérer toute la logique
+    const editorLogic = useEditorLogic(strategyId);
+
+
     const {
         // Refs
         mainCanvasRef, tempCanvasRef, containerRef, imgRef, trashRef, contentRef,
+
+        // ZOOM FUNCTION (A AJOUTER DANS useEditorLogic return)
+        centerView,
 
         // Data & State
         steps, currentStepIndex, setCurrentStepIndex, currentMapSrc,
@@ -40,7 +45,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         isRotated, setIsRotated,
         isOverTrash, getCursorStyle,
 
-
         // Handlers
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave,
         handleContextMenu, handleDrop, handleDoubleClick,
@@ -50,7 +54,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         handleSaveText, handleLoadStrategy,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
         handleFolderChange, handleDeleteRequest, confirmDelete, fetchStrategies
-    } = useEditorLogic(strategyId);
+    } = editorLogic;
 
     const showReverseImage = isRotated && reverseMapSrc && !reverseMapError;
 
@@ -64,7 +68,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     opacity={opacity} setOpacity={setOpacity}
                     thickness={thickness} setThickness={setThickness}
                     selectedAgent={selectedAgent} setSelectedAgent={setSelectedAgent}
-                    onSave={() => {}} // Auto-save géré par le hook
+                    onSave={() => {}}
                     onLoad={fetchStrategies}
                     showZones={showZones} setShowZones={setShowZones}
                     iconSize={iconSize} setIconSize={setIconSize}
@@ -92,37 +96,35 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                  onContextMenu={handleContextMenu}
                  onDoubleClick={handleDoubleClick}>
 
-                {/* --- 1. TRASH AREA (SORTIE DU ZOOM) --- */}
-
-
-                {/* --- 2. ZOOMABLE CONTENT --- */}
-                <div ref={contentRef} className="origin-top-left absolute top-0 left-0">
+                <div ref={contentRef} className="origin-top-left absolute bg-[#ffffff] top-0 left-0"> {/* origin-top-left est important pour le calcul de zoom */}
                     <div ref={trashRef} className={`absolute top-4 right-4 z-50 p-3 rounded-xl border-2 transition-all duration-200 backdrop-blur-sm ${isOverTrash ? 'bg-red-500/30 border-red-500 scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-black/40 border-white/10 hover:bg-black/60 text-white/50 hover:text-white'}`} title="Glisser ici pour supprimer">
                         <Trash2 size={32} className={isOverTrash ? 'text-red-500 animate-bounce' : 'text-inherit'} />
                     </div>
                     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
 
-                        {/* BACKGROUND MAP IMAGE */}
                         {currentMapSrc && (
                             <img
                                 ref={imgRef}
                                 src={(showReverseImage ? reverseMapSrc : currentMapSrc) || undefined}
                                 alt="Map"
                                 draggable={false}
-                                className="block pointer-events-none h-auto shadow-lg p-10 relative z-0"
+                                className="block pointer-events-none h-auto shadow-lg  p-10 relative z-0"
                                 style={{
                                     width: '100%',
                                     minWidth: '1024px',
                                     transform: (!showReverseImage && isRotated) ? 'rotate(180deg)' : 'none'
                                 }}
-                                onLoad={() => {}}
+                                onLoad={() => {
+                                    // APPEL DE CENTER VIEW ICI
+                                    if (centerView) centerView(0.75);
+                                }}
                                 onError={() => {
                                     if (showReverseImage) setReverseMapError(true);
                                 }}
                             />
                         )}
 
-                        {/* 2. CALLS OVERLAY */}
+                        {/* ... reste du code ... */}
                         {showMapCalls && (
                             <img
                                 src={((isRotated && reverseCallsMapSrc && !reverseCallsError) ? reverseCallsMapSrc : (callsMapSrc || undefined)) || undefined}
@@ -141,7 +143,6 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                             />
                         )}
 
-                        {/* 3. CANVAS WRAPPER */}
                         <div className="absolute inset-0 z-20 pointer-events-none" style={{ transform: isRotated ? 'rotate(180deg)' : 'none' }}>
                             <canvas ref={mainCanvasRef} className="absolute inset-0 w-full h-full" />
                             <canvas ref={tempCanvasRef} className="absolute inset-0 w-full h-full" />
