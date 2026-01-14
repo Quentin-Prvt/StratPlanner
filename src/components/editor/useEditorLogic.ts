@@ -34,6 +34,7 @@ export const useEditorLogic = (strategyId: string) => {
     const imgRef = useRef<HTMLImageElement>(null);
     const trashRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<number | null>(null);
+    const currentStepIndexRef = useRef(0);
 
     // --- STATE REFS ---
     const drawingsRef = useRef<DrawingObject[]>([]);
@@ -60,7 +61,7 @@ export const useEditorLogic = (strategyId: string) => {
     const [reverseMapError, setReverseMapError] = useState(false);
     const [reverseCallsError, setReverseCallsError] = useState(false);
     const [steps, setSteps] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [] }]);
-    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [currentStepIndex, setCurrentStepIndexState] = useState(0);
     const [showZones, setShowZones] = useState(true);
     const [iconSize, setIconSize] = useState(30);
     const [folders, setFolders] = useState<{id: string, name: string}[]>([]);
@@ -86,6 +87,11 @@ export const useEditorLogic = (strategyId: string) => {
     const getCurrentScale = () => {
         const entry = Object.entries(MAP_CONFIGS).find(([_, config]) => config.src === currentMapSrc);
         return entry ? entry[1].scale : 0.75;
+    };
+
+    const setCurrentStepIndex = (index: number) => {
+        currentStepIndexRef.current = index;
+        setCurrentStepIndexState(index);
     };
 
     const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
@@ -166,26 +172,10 @@ export const useEditorLogic = (strategyId: string) => {
     }, [strategyId]);
 
     // --- REALTIME ---
-    useRealtimeStrategy(
+    const { broadcastMove } = useRealtimeStrategy(
         strategyId,
-        (newDrawings: any) => {
-            if (isInteractingRef.current) {
-                // console.log("🛡️ [REALTIME] Blocked (User Interaction)");
-                return;
-            }
-
-            if (Array.isArray(newDrawings)) {
-                setSteps(prev => {
-                    const newSteps = [...prev];
-                    if(newSteps[currentStepIndex]) {
-                        newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newDrawings };
-                    }
-                    return newSteps;
-                });
-            } else if (newDrawings.steps) {
-                setSteps(newDrawings.steps);
-            }
-        },
+        setSteps,
+        currentStepIndexRef,
         isRemoteUpdate,
         isInteractingRef
     );
@@ -425,14 +415,28 @@ export const useEditorLogic = (strategyId: string) => {
             // OPTIMISATION: Update local REF uniquement pendant le drag
             const updatedList = drawingsRef.current.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
+
+                // Calcul de la nouvelle position
+                let newX = obj.x;
+                let newY = obj.y;
+
                 if ((obj.tool === 'image' || obj.tool === 'text') && obj.x !== undefined) {
-                    let newX = pos.x - dragOffset.x; let newY = pos.y - dragOffset.y;
-                    if (canvas) { newX = clamp(newX, 0, canvas.width); newY = clamp(newY, 0, canvas.height); }
+                    newX = pos.x - dragOffset.x;
+                    newY = pos.y - dragOffset.y;
+                    if (canvas) {
+                        newX = clamp(newX, 0, canvas.width);
+                        newY = clamp(newY, 0, canvas.height);
+                    }
+                    broadcastMove(obj.id, newX, newY);
                     return { ...obj, x: newX, y: newY };
                 }
                 const mapScale = getCurrentScale();
                 // @ts-ignore
-                return updateAbilityPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart, mapScale);
+                const updatedObj = updateAbilityPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart, mapScale);
+                if (updatedObj.x !== undefined && updatedObj.y !== undefined) {
+                    broadcastMove(updatedObj.id, updatedObj.x, updatedObj.y);
+                }
+                return updatedObj;
             });
             drawingsRef.current = updatedList;
             redrawMainCanvas();
