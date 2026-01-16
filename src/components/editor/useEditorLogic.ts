@@ -11,6 +11,7 @@ import { renderDrawings } from '../../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../../utils/dropFactory';
 import { MAP_CONFIGS } from '../../utils/mapsRegistry';
 import type { DrawingObject, ToolType, StrokeType, StrategyStep } from '../../types/canvas';
+import { useAuth } from '../../contexts/AuthContext'; // Extension .tsx retirée (standard)
 
 // Helper ID
 const generateId = () => Date.now() + Math.random();
@@ -83,6 +84,9 @@ export const useEditorLogic = (strategyId: string) => {
     const [specialDragMode, setSpecialDragMode] = useState<string | null>(null);
     const [wallCenterStart, setWallCenterStart] = useState({ x: 0, y: 0 });
 
+    // --- AUTH ---
+    const { user } = useAuth();
+
     // --- COMPUTED ---
     const getCurrentScale = () => {
         const entry = Object.entries(MAP_CONFIGS).find(([_, config]) => config.src === currentMapSrc);
@@ -128,12 +132,10 @@ export const useEditorLogic = (strategyId: string) => {
     // --- DATA HANDLING ---
     const immediateSave = (stepsData: StrategyStep[], idx: number = currentStepIndex) => {
         if (!strategyId) return;
-        // console.log(`💾 [SAVE] Saving ${stepsData[idx].data.length} items to DB.`);
         updateStrategyData(strategyId, { steps: stepsData, currentStepIndex: idx } as any);
     };
 
     const debouncedSave = useMemo(() => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
-        // console.log("⏱️ [DEBOUNCE SAVE] Firing...");
         updateStrategyData(id, { steps: stepsData, currentStepIndex: idx } as any);
     }, 1000), [updateStrategyData]);
 
@@ -172,8 +174,10 @@ export const useEditorLogic = (strategyId: string) => {
     }, [strategyId]);
 
     // --- REALTIME ---
-    const { broadcastMove } = useRealtimeStrategy(
+    // Modification ici : Ajout de user, broadcastCursor, remoteCursors
+    const { broadcastMove, broadcastCursor, remoteCursors } = useRealtimeStrategy(
         strategyId,
+        user,
         setSteps,
         currentStepIndexRef,
         isRemoteUpdate,
@@ -186,8 +190,6 @@ export const useEditorLogic = (strategyId: string) => {
         if (isRemoteUpdate.current) { isRemoteUpdate.current = false; return; }
         if (isInteractingRef.current) return;
 
-        // Debounce save pour les changements mineurs non capturés ailleurs
-        // (mais la plupart des actions utilisent maintenant immediateSave)
         debouncedSave(strategyId, steps, currentStepIndex);
 
         return () => debouncedSave.cancel();
@@ -229,7 +231,6 @@ export const useEditorLogic = (strategyId: string) => {
 
         if (newDrawings.length !== drawingsRef.current.length) {
             drawingsRef.current = newDrawings;
-            // Update State & DB
             setSteps(prev => {
                 const newSteps = [...prev];
                 if (newSteps[currentStepIndex]) {
@@ -291,12 +292,11 @@ export const useEditorLogic = (strategyId: string) => {
         isInteractingRef.current = true;
 
         const currentScale = transformRef.current.scale;
-        const isMinZoom = currentScale <= 0.501; // Petite marge de sécurité pour les flottants
+        const isMinZoom = currentScale <= 0.501; // Petite marge de sécurité
         const isMiddleClick = e.button === 1;
         const isLeftClick = e.button === 0;
 
-        // PRIORITÉ ABSOLUE : PAN via CLIC MOLETTE (Toujours possible sauf si min zoom)
-        // On sépare le clic molette car lui doit toujours pan, peu importe ce qu'il y a dessous
+        // 1. PRIORITÉ : PAN via CLIC MOLETTE
         if (isMiddleClick && !isMinZoom) {
             setIsPanning(true);
             panStartRef.current = { x: e.clientX, y: e.clientY };
@@ -308,36 +308,32 @@ export const useEditorLogic = (strategyId: string) => {
         const mapScale = getCurrentScale();
         const pos = getMousePos(e);
 
-        // DETECTION DES OBJETS (Seulement si outil Cursor/Settings/Tools)
+        // 2. DETECTION DES OBJETS
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
-
-            // On vérifie d'abord si on clique sur un objet
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
 
-                // Detection Text
+                // Text
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
                     if (Math.abs(pos.x - obj.x) < approxWidth/2 && Math.abs(pos.y - obj.y) < fontSize/2) {
                         setDraggingObjectId(obj.id);
                         setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y });
-                        return; // <--- IMPORTANT : On sort si on a trouvé un objet
+                        return;
                     }
                 }
-
-                // Detection Image / Agent
+                // Image / Agent
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = (obj.width || iconSize) * mapScale; const h = (obj.height || iconSize) * mapScale;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
                         setDraggingObjectId(obj.id);
                         setSpecialDragMode(null);
                         setDragOffset({ x: pos.x - obj.x, y: pos.y - obj.y });
-                        return; // <--- IMPORTANT : On sort si on a trouvé un objet
+                        return;
                     }
                 }
-
-                // Detection Ability
+                // Ability
                 // @ts-ignore
                 const hit = checkAbilityHit(pos, obj, mapScale);
                 if (hit) {
@@ -345,11 +341,11 @@ export const useEditorLogic = (strategyId: string) => {
                     setSpecialDragMode(hit.mode);
                     if (hit.offset) setDragOffset(hit.offset);
                     if (hit.centerStart) setWallCenterStart(hit.centerStart);
-                    return; // <--- IMPORTANT : On sort si on a trouvé un objet
+                    return;
                 }
             }
 
-            // 3. SI AUCUN OBJET TROUVÉ -> ALORS ON PAN (Si Clic Gauche + Zoomé)
+            // 3. SI AUCUN OBJET -> PAN
             setDraggingObjectId(null);
 
             if (isLeftClick && !isMinZoom) {
@@ -365,7 +361,6 @@ export const useEditorLogic = (strategyId: string) => {
             const newObj: DrawingObject = { id: generateId(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: iconSize, height: iconSize };
             drawingsRef.current = [...drawingsRef.current, newObj];
             redrawMainCanvas();
-
             setSteps(prev => {
                 const newSteps = [...prev];
                 if (newSteps[currentStepIndex]) {
@@ -390,6 +385,7 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        // --- GESTION POUBELLE ---
         if (draggingObjectId !== null && trashRef.current) {
             const trashRect = trashRef.current.getBoundingClientRect();
             const isOver = e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
@@ -399,6 +395,7 @@ export const useEditorLogic = (strategyId: string) => {
             setIsOverTrash(false);
         }
 
+        // --- GESTION PAN ---
         if (isPanning) {
             e.preventDefault();
             const dx = e.clientX - panStartRef.current.x;
@@ -407,16 +404,20 @@ export const useEditorLogic = (strategyId: string) => {
             panStartRef.current = { x: e.clientX, y: e.clientY };
             return;
         }
+
         const rawPos = getMousePos(e);
         const canvas = mainCanvasRef.current;
         const pos = { x: canvas ? clamp(rawPos.x, 0, canvas.width) : rawPos.x, y: canvas ? clamp(rawPos.y, 0, canvas.height) : rawPos.y };
 
+        // --- BROADCAST CURSEUR (NOUVEAU) ---
+        // On envoie la position "Map" aux autres utilisateurs
+        broadcastCursor(pos.x, pos.y);
+
+        // --- GESTION DRAG ---
         if (draggingObjectId !== null) {
-            // OPTIMISATION: Update local REF uniquement pendant le drag
             const updatedList = drawingsRef.current.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
 
-                // Calcul de la nouvelle position
                 let newX = obj.x;
                 let newY = obj.y;
 
@@ -442,6 +443,8 @@ export const useEditorLogic = (strategyId: string) => {
             redrawMainCanvas();
             return;
         }
+
+        // --- GESTION DESSIN (PEN) ---
         if (!isDrawing) return;
         if (currentTool === 'eraser') { eraseObjectAt(pos.x, pos.y); return; }
         if (currentTool === 'pen') {
@@ -469,7 +472,6 @@ export const useEditorLogic = (strategyId: string) => {
         if (draggingObjectId !== null && isOverTrash) {
             const updatedDrawings = drawingsRef.current.filter(obj => obj.id !== draggingObjectId);
             drawingsRef.current = updatedDrawings;
-            // Sync React et DB de manière sécurisée
             setSteps(prev => {
                 const newSteps = [...prev];
                 if (newSteps[currentStepIndex]) {
@@ -479,7 +481,6 @@ export const useEditorLogic = (strategyId: string) => {
                 immediateSave(newSteps);
                 return newSteps;
             });
-
             setIsOverTrash(false);
             setDraggingObjectId(null);
             setSpecialDragMode(null);
@@ -570,10 +571,8 @@ export const useEditorLogic = (strategyId: string) => {
 
     const handleClearType = (typeFilter: (obj: DrawingObject) => boolean) => {
         const newDrawings = drawingsRef.current.filter(obj => !typeFilter(obj));
-
         drawingsRef.current = newDrawings;
         redrawMainCanvas();
-
         if(strategyId) {
             setSteps(prevSteps => {
                 const newSteps = prevSteps.map((s, i) =>
@@ -587,41 +586,34 @@ export const useEditorLogic = (strategyId: string) => {
     };
     const handleClearAgents = () => handleClearType(obj => obj.tool === 'image' && obj.subtype === 'agent');
     const handleClearAbilities = () => handleClearType(obj =>
-        // Soit c'est une image de type 'ability', soit c'est un outil vectoriel qui n'est ni image, ni texte, ni crayon de base
         (obj.tool === 'image' && obj.subtype === 'ability') ||
-        (!['image', 'text', 'pen', 'rect'].includes(obj.tool as string) && !obj.lineType) // lineType check pour les vieux dessins
+        (!['image', 'text', 'pen', 'rect'].includes(obj.tool as string) && !obj.lineType)
     );
     const handleClearText = () => handleClearType(obj => obj.tool === 'text');
     const handleClearDrawings = () => handleClearType(obj =>
         ['pen', 'dashed', 'arrow', 'dashed-arrow', 'rect'].includes(obj.tool as string) ||
-        (obj.tool === 'pen') // Check tool 'pen' générique
+        (obj.tool === 'pen')
     );
 
     const getCursorStyle = () => {
-        // Si on est dézoomé au max, curseur par défaut
         if (transformRef.current.scale <= 0.501) {
-            // Sauf si on survole un outil interactif (gomme, etc), mais pour le pan c'est default
             if (currentTool === 'cursor') return 'default';
         }
 
         if (isPanning) return 'grabbing';
         if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') {
-            // On pourrait ajouter 'grab' ici si on est zoomé, mais 'default' est souvent plus propre
             return 'default';
         }
         if (currentTool === 'eraser') return 'crosshair';
         return 'crosshair';
     };
 
-    // --- CONTEXT MENU (CLIC DROIT) ---
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
-
         const pos = getMousePos(e);
         const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
         const finalX = pos.x;
         const finalY = pos.y;
-
         const currentList = [...drawingsRef.current];
         let hasDeleted = false;
         const mapScale = getCurrentScale();
@@ -630,22 +622,18 @@ export const useEditorLogic = (strategyId: string) => {
         for (let i = currentList.length - 1; i >= 0; i--) {
             const obj = currentList[i];
             let hit = false;
-
-            // Detection IMAGES / AGENTS / ICONES
             if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                 const w = (obj.width || iconSize) * mapScale;
                 const h = (obj.height || iconSize) * mapScale;
                 if (finalX >= obj.x - w/2 - HIT_TOLERANCE && finalX <= obj.x + w/2 + HIT_TOLERANCE &&
                     finalY >= obj.y - h/2 - HIT_TOLERANCE && finalY <= obj.y + h/2 + HIT_TOLERANCE) hit = true;
             }
-            // Detection TEXTE
             else if (obj.tool === 'text' && obj.x != null) {
                 const fontSize = (obj.fontSize || 20) * mapScale;
                 const textWidth = (obj.text?.length || 1) * fontSize * 0.7 + 20;
                 const textHeight = fontSize + 20;
                 if (Math.abs(finalX - obj.x) < (textWidth / 2) && Math.abs(finalY - obj.y!) < (textHeight / 2)) hit = true;
             }
-            // Detection TRAITS (PEN)
             else if (['pen', 'dashed', 'arrow', 'dashed-arrow'].includes(obj.tool as string) || obj.tool === 'pen') {
                 const tolerance = (obj.thickness || 4) + 20;
                 const hitLine = obj.points.some((p, idx) => {
@@ -655,7 +643,6 @@ export const useEditorLogic = (strategyId: string) => {
                 });
                 if (hitLine) hit = true;
             }
-            // Detection RECT
             else if (obj.tool === 'rect' && obj.points.length > 1) {
                 const p1 = obj.points[0]; const p2 = obj.points[1];
                 const margin = 10;
@@ -663,41 +650,31 @@ export const useEditorLogic = (strategyId: string) => {
                 const minY = Math.min(p1.y, p2.y) - margin; const maxY = Math.max(p1.y, p2.y) + margin;
                 if(finalX >= minX && finalX <= maxX && finalY >= minY && finalY <= maxY) hit = true;
             }
-            // Detection ABILITIES
             else {
                 // @ts-ignore
                 if (checkAbilityHit(pos, obj, mapScale)) hit = true;
             }
-
             if (hit) {
                 currentList.splice(i, 1);
                 hasDeleted = true;
                 break;
             }
         }
-
         if (hasDeleted) {
-            // A. Mise à jour Visuelle Immédiate (via Ref)
             drawingsRef.current = currentList;
             redrawMainCanvas();
-
-            // B. Mise à jour de la Base de Données (via State sécurisé)
             setSteps(prevSteps => {
                 const newSteps = [...prevSteps];
                 if (newSteps[currentStepIndex]) {
                     newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: currentList };
                 }
-
                 debouncedSave.cancel();
                 immediateSave(newSteps);
-
                 return newSteps;
             });
         }
     };
 
-    // ... (Reste des fonctions inchangées : handleDrop, handleSaveText, step actions...)
-    // --- DROP ---
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const jsonData = e.dataTransfer.getData("application/json"); if (!jsonData) return;
@@ -711,12 +688,9 @@ export const useEditorLogic = (strategyId: string) => {
 
             if (newObj) {
                 newObj.id = generateId();
-
                 const newList = [...drawingsRef.current, newObj];
                 drawingsRef.current = newList;
-
                 setCurrentTool('cursor');
-
                 setSteps(prevSteps => {
                     const newSteps = [...prevSteps];
                     if (newSteps[currentStepIndex]) {
@@ -733,7 +707,6 @@ export const useEditorLogic = (strategyId: string) => {
     const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
         const newId = generateId();
         let currentList = [...drawingsRef.current];
-
         if (editingTextId !== null) {
             currentList = currentList.map(obj => obj.id === editingTextId ? { ...obj, text: data.text, color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal', fontStyle: data.isItalic ? 'italic' : 'normal' } : obj);
             setEditingTextId(null);
@@ -755,7 +728,6 @@ export const useEditorLogic = (strategyId: string) => {
             };
             currentList.push(newText);
         }
-
         drawingsRef.current = currentList;
         setSteps(prevSteps => {
             const newSteps = [...prevSteps];
@@ -766,7 +738,6 @@ export const useEditorLogic = (strategyId: string) => {
             immediateSave(newSteps);
             return newSteps;
         });
-
         setIsTextModalOpen(false);
         setCurrentTool('cursor');
     };
@@ -787,7 +758,6 @@ export const useEditorLogic = (strategyId: string) => {
         }
     };
 
-    // --- STEP ACTIONS ---
     const handleAddStep = () => {
         setSteps(prevSteps => {
             const newSteps = [...prevSteps, { id: generateId().toString(), name: `Phase ${prevSteps.length + 1}`, data: [] }];
@@ -809,7 +779,6 @@ export const useEditorLogic = (strategyId: string) => {
             };
             const newSteps = [...prevSteps];
             newSteps.splice(currentStepIndex + 1, 0, newStep);
-
             const newIndex = currentStepIndex + 1;
             immediateSave(newSteps, newIndex);
             setCurrentStepIndex(newIndex);
@@ -839,7 +808,6 @@ export const useEditorLogic = (strategyId: string) => {
         });
     };
 
-    // --- FILE ACTIONS ---
     const handleFolderChange = async (newFolderId: string) => {
         setCurrentFolderId(newFolderId);
         if (strategyId) {
@@ -869,20 +837,17 @@ export const useEditorLogic = (strategyId: string) => {
 
     return {
         mainCanvasRef, tempCanvasRef, containerRef, imgRef, trashRef, contentRef, centerView, panCanvas,
-
         drawings: drawingsRef.current,
         steps, currentStepIndex, setCurrentStepIndex,
         currentMapSrc,
         reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
         reverseMapError, setReverseMapError,
         reverseCallsError, setReverseCallsError,
-
         isLoading, showLoadModal, setShowLoadModal, savedStrategies,
         isTextModalOpen, setIsTextModalOpen,
         showDeleteModal, setShowDeleteModal,
         editingObj, setEditingTextId,
         folders, currentFolderId,
-
         currentTool, setCurrentTool,
         strokeType, setStrokeType,
         color, setColor,
@@ -894,14 +859,13 @@ export const useEditorLogic = (strategyId: string) => {
         iconSize, setIconSize,
         isRotated, setIsRotated,
         isOverTrash, getCursorStyle,
-
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave,
         handleContextMenu, handleDrop, handleDoubleClick,
-
         handleClearAll, handleClearAgents, handleClearAbilities, handleClearText, handleClearDrawings,
         handleSaveText, handleLoadStrategy,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
         handleFolderChange, handleDeleteRequest: () => setShowDeleteModal(true), confirmDelete,
         fetchStrategies,
+        remoteCursors, // Retourne les curseurs des autres utilisateurs
     };
 };
