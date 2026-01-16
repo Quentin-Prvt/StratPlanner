@@ -13,16 +13,6 @@ interface RemoteCursorOverlayProps {
     cursors: Record<string, RemoteCursor>; // Dictionnaire des curseurs actifs
 }
 
-// Fonction pour générer une couleur stable depuis l'ID de l'user
-const stringToColor = (str: string) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const c = (hash & 0x00ffffff).toString(16).toUpperCase();
-    return '#' + '00000'.substring(0, 6 - c.length) + c;
-};
-
 export const RemoteCursorOverlay = ({ cursors }: RemoteCursorOverlayProps) => {
     return (
         <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
