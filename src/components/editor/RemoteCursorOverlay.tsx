@@ -1,4 +1,3 @@
-import React from 'react'; // N'oubliez pas l'import React si nécessaire selon votre config
 import { MousePointer2 } from 'lucide-react';
 
 export interface RemoteCursor {
