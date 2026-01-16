@@ -46,26 +46,26 @@ export const renderDrawings = (
     draggingObjectId: number | null,
     showZones: boolean = true,
     mapScale: number = 1.0,
-    globalIconSize: number = 20
+    globalIconSize: number = 20,
+    isRotated: boolean = false // <--- AJOUT DU PARAMÈTRE ICI
 ) => {
-    // Nettoyage du canvas
+    // 1. Nettoyage du canvas
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     drawings.forEach(obj => {
-        // On sauvegarde l'état pur du contexte avant de dessiner cet objet
         ctx.save();
-
-        // On force le reset des pointillés pour éviter la contamination
-        ctx.setLineDash([]);
+        ctx.setLineDash([]); // Reset des pointillés par sécurité
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = obj.opacity;
 
-        // --- TEXTE ---
+        // --- A. TEXTE (AVEC CONTRE-ROTATION) ---
         if (obj.tool === 'text' && obj.text && obj.x !== undefined && obj.y !== undefined) {
-            // ctx.save(); // Redondant avec le save() global de la boucle
-            const textX = obj.x;
-            const textY = obj.y;
+            // On se déplace au point d'ancrage du texte
+            ctx.translate(obj.x, obj.y);
+
+            // Si la map est retournée, on retourne le contexte de 180° pour que le texte reste lisible
+            if (isRotated) ctx.rotate(Math.PI);
 
             const fontSize = (obj.fontSize || 20) * mapScale;
             const fontWeight = obj.fontWeight || 'normal';
@@ -78,7 +78,8 @@ export const renderDrawings = (
             const lines = obj.text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
-            const startY = textY - (totalHeight / 2) + (lineHeight / 2);
+            // Calcul du Y de départ centré (relatif à 0,0)
+            const startY = -(totalHeight / 2) + (lineHeight / 2);
 
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
@@ -87,10 +88,11 @@ export const renderDrawings = (
 
             lines.forEach((line, index) => {
                 const lineY = startY + (index * lineHeight);
-                ctx.strokeText(line, textX, lineY);
+                // On dessine en X=0 car on a déjà translate
+                ctx.strokeText(line, 0, lineY);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = obj.color;
-                ctx.fillText(line, textX, lineY);
+                ctx.fillText(line, 0, lineY);
                 ctx.shadowBlur = 4;
             });
 
@@ -105,13 +107,15 @@ export const renderDrawings = (
                 ctx.strokeStyle = '#22c55e';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([5, 5]);
-                ctx.strokeRect(textX - width/2, textY - height/2, width, height);
+                // Cadre centré sur 0,0
+                ctx.strokeRect(-width/2, -height/2, width, height);
             }
-            ctx.restore(); // Restaure pour passer au suivant
+            ctx.restore();
             return;
         }
 
-        // --- ABILITIES VECTORIELLES ---
+        // --- B. ABILITIES VECTORIELLES ---
+        // (Les zones au sol tournent généralement avec la map, donc pas de changement ici)
         if (obj.tool === 'stun_zone') { drawBreachStun(ctx, obj, mapScale); ctx.restore(); return; }
         if (obj.tool === 'breach_x_zone') { drawBreachUlt(ctx, obj, mapScale); ctx.restore(); return; }
         if (obj.tool === 'breach_c_zone') { drawBreachAftershock(ctx, obj, mapScale); ctx.restore(); return; }
@@ -148,7 +152,7 @@ export const renderDrawings = (
         if (obj.tool === 'vyse_x_zone') { drawVyseUltZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
         if (obj.tool === 'waylay_x_zone') { drawWaylayUlt(ctx, obj, mapScale); ctx.restore(); return; }
 
-        // --- C. IMAGES CLASSIQUES ---
+        // --- C. IMAGES CLASSIQUES (AGENTS) AVEC CONTRE-ROTATION ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             let img = imageCache.get(obj.imageSrc);
             if (!img) {
@@ -169,16 +173,26 @@ export const renderDrawings = (
                 if (isAgent || isAbilityIcon) baseSize = globalIconSize;
 
                 const targetSize = baseSize * mapScale;
+
+                // 1. On va au centre de l'objet
                 const centerX = obj.x;
                 const centerY = obj.y;
+
+                ctx.translate(centerX, centerY);
+
+                // 2. Si rotation map activée, on pivote l'icône de 180° pour qu'elle reste droite
+                if (isRotated) ctx.rotate(Math.PI);
+
                 const ratio = img.naturalWidth / img.naturalHeight;
                 let drawW = targetSize;
                 let drawH = targetSize;
                 if (ratio > 1) drawH = targetSize / ratio; else drawW = targetSize * ratio;
-                const drawX = centerX - drawW / 2;
-                const drawY = centerY - drawH / 2;
 
-                ctx.save(); // Save interne pour le clip
+                // 3. On dessine centré sur (0,0) (qui est maintenant obj.x, obj.y)
+                const drawX = -drawW / 2;
+                const drawY = -drawH / 2;
+
+                ctx.save(); // Save pour le clip
 
                 const isIconType = obj.subtype === 'icon';
                 const hasFrame = isAgent || (obj.imageSrc.includes('_icon') && !isIconType) || (obj.subtype === 'ability' && !obj.imageSrc.includes('_game'));
@@ -189,19 +203,19 @@ export const renderDrawings = (
 
                     const agentColor = getAgentColor(agentName);
                     const boxSize = targetSize;
-                    const frameX = centerX - boxSize/2;
-                    const frameY = centerY - boxSize/2;
+                    const frameX = -boxSize/2; // Relatif à 0,0
+                    const frameY = -boxSize/2;
                     const borderRadius = 6 * mapScale;
 
                     ctx.beginPath();
-
+                    // @ts-ignore
                     if (ctx.roundRect) ctx.roundRect(frameX, frameY, boxSize, boxSize, borderRadius);
                     else ctx.rect(frameX, frameY, boxSize, boxSize);
 
                     ctx.fillStyle = hexToRgba(agentColor, 0.8);
                     ctx.fill();
 
-                    ctx.save(); // Save pour le clip
+                    ctx.save(); // Save interne pour clip
                     ctx.clip();
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                     ctx.restore(); // Restore clip
@@ -210,29 +224,29 @@ export const renderDrawings = (
                     ctx.lineWidth = 1.5 * mapScale;
                     ctx.shadowColor = '#000000';
                     ctx.shadowBlur = 4;
-                    // On s'assure que le cadre est solide
                     ctx.setLineDash([]);
                     ctx.stroke();
                 } else {
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                 }
 
-                ctx.restore(); // Restore save interne
+                ctx.restore(); // Restore save pour le clip
 
                 if (draggingObjectId === obj.id) {
                     ctx.save();
                     ctx.strokeStyle = '#22c55e';
                     ctx.lineWidth = 2;
                     ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(centerX - targetSize/2 - 4, centerY - targetSize/2 - 4, targetSize + 8, targetSize + 8);
+                    ctx.strokeRect(-targetSize/2 - 4, -targetSize/2 - 4, targetSize + 8, targetSize + 8);
                     ctx.restore();
                 }
             }
-            ctx.restore(); // Restore save global
+            ctx.restore(); // Restore translate/rotate global pour cet objet
             return;
         }
 
-        // ---DESSIN VECTORIEL ---
+        // --- D. DESSIN VECTORIEL (LIGNES, FLÈCHES) ---
+        // Les lignes suivent généralement la géométrie de la map, donc on ne les contre-pivote pas.
 
         ctx.strokeStyle = obj.color;
         ctx.lineWidth = obj.thickness;
@@ -245,27 +259,22 @@ export const renderDrawings = (
         const isArrow = style.includes('arrow');
         const isRect = style === 'rect';
 
-        // Application des pointillés
         if (isDashed) {
             ctx.setLineDash([obj.thickness * 2, obj.thickness * 2]);
         } else {
             ctx.setLineDash([]);
         }
 
-        //  Dessiner la forme
         if (isRect && obj.points.length > 1) {
             const start = obj.points[0];
             const end = obj.points[1];
             ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
         } else {
-            // Dessin du trait
             if (obj.points.length > 0) {
                 drawSmoothLine(ctx, obj.points);
 
-                // Dessin de la flèche à la fin
                 if (isArrow && obj.points.length > 2) {
                     const last = obj.points[obj.points.length - 1];
-                    // On recule un peu pour trouver l'angle de la pointe
                     const prevIndex = Math.max(0, obj.points.length - 5);
                     const prev = obj.points[prevIndex];
 
@@ -276,6 +285,6 @@ export const renderDrawings = (
             }
         }
 
-        ctx.restore(); // Fin du bloc, on restaure pour le prochain
+        ctx.restore();
     });
 };
