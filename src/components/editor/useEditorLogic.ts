@@ -295,7 +295,7 @@ export const useEditorLogic = (strategyId: string) => {
         const isMiddleClick = e.button === 1;
         const isLeftClick = e.button === 0;
 
-        // 1. PRIORITÉ ABSOLUE : PAN via CLIC MOLETTE (Toujours possible sauf si min zoom)
+        // PRIORITÉ ABSOLUE : PAN via CLIC MOLETTE (Toujours possible sauf si min zoom)
         // On sépare le clic molette car lui doit toujours pan, peu importe ce qu'il y a dessous
         if (isMiddleClick && !isMinZoom) {
             setIsPanning(true);
@@ -308,7 +308,7 @@ export const useEditorLogic = (strategyId: string) => {
         const mapScale = getCurrentScale();
         const pos = getMousePos(e);
 
-        // 2. DETECTION DES OBJETS (Seulement si outil Cursor/Settings/Tools)
+        // DETECTION DES OBJETS (Seulement si outil Cursor/Settings/Tools)
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
 
             // On vérifie d'abord si on clique sur un objet

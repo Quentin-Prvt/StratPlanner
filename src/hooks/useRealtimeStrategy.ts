@@ -12,8 +12,7 @@ export const useRealtimeStrategy = (
 ) => {
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-    // --- FONCTION D'ENVOI (BROADCAST) ---
-    // On utilise throttle pour ne pas envoyer 60 messages par seconde, mais plutôt ~30 (30ms)
+
     const broadcastMove = useCallback(
         throttle((objectId: number, x: number, y: number) => {
             if (!channelRef.current) return;

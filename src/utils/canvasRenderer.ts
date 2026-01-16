@@ -48,16 +48,22 @@ export const renderDrawings = (
     mapScale: number = 1.0,
     globalIconSize: number = 20
 ) => {
-    // 1. Nettoyage du canvas
+    // Nettoyage du canvas
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     drawings.forEach(obj => {
+        // On sauvegarde l'état pur du contexte avant de dessiner cet objet
+        ctx.save();
+
+        // On force le reset des pointillés pour éviter la contamination
+        ctx.setLineDash([]);
+
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = obj.opacity;
 
-        // --- A. TEXTE ---
+        // --- TEXTE ---
         if (obj.tool === 'text' && obj.text && obj.x !== undefined && obj.y !== undefined) {
-            ctx.save();
+            // ctx.save(); // Redondant avec le save() global de la boucle
             const textX = obj.x;
             const textY = obj.y;
 
@@ -72,7 +78,7 @@ export const renderDrawings = (
             const lines = obj.text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
-            let startY = textY - (totalHeight / 2) + (lineHeight / 2);
+            const startY = textY - (totalHeight / 2) + (lineHeight / 2);
 
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
@@ -101,46 +107,46 @@ export const renderDrawings = (
                 ctx.setLineDash([5, 5]);
                 ctx.strokeRect(textX - width/2, textY - height/2, width, height);
             }
-            ctx.restore();
+            ctx.restore(); // Restaure pour passer au suivant
             return;
         }
 
-        // --- B. ABILITIES VECTORIELLES ---
-        if (obj.tool === 'stun_zone') { drawBreachStun(ctx, obj, mapScale); return; }
-        if (obj.tool === 'breach_x_zone') { drawBreachUlt(ctx, obj, mapScale); return; }
-        if (obj.tool === 'breach_c_zone') { drawBreachAftershock(ctx, obj, mapScale); return; }
-        if (obj.tool === 'wall') { drawAstraWall(ctx, obj); return; }
-        if (obj.tool === 'brimstone_c_zone') { drawBrimstoneStim(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'brimstone_x_zone') { drawBrimstoneUlt(ctx, obj, mapScale); return; }
-        if (obj.tool === 'chamber_c_zone') { drawChamberTrademark(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'chamber_e_zone') { drawChamberRendezvous(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'cypher_c_wire') { drawCypherTrapwire(ctx, obj, mapScale); return; }
-        if (obj.tool === 'cypher_q_zone') { drawCypherCage(ctx, obj, mapScale); return; }
-        if (obj.tool === 'deadlock_c_wall') { drawDeadlockWall(ctx, obj, mapScale); return; }
-        if (obj.tool === 'deadlock_q_sensor') { drawDeadlockSensor(ctx, obj, mapScale); return; }
-        if (obj.tool === 'fade_x_zone') { drawFadeUlt(ctx, obj, mapScale); return; }
-        if (obj.tool === 'fade_e_zone') { drawFadeHaunt(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'fade_q_zone') { drawFadeSeize(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'gekko_q_wingman') { drawGekkoQ(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
-        if (obj.tool === 'harbor_x_zone') {drawHarborUlt(ctx, obj, mapScale); return; }
-        if (['iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); return; }
-        if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { drawKayoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'killjoy_c_zone' || obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') { drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'killjoy_e_turret') { drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, showZones,  mapScale); return; }
-        if (obj.tool === 'neon_c_wall') { drawNeonWall(ctx, obj, mapScale); return; }
-        if (obj.tool === 'neon_q_zone') { drawNeonStun(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
-        if (obj.tool === 'omen_q_zone') { drawOmenParanoia(ctx, obj, mapScale); return; }
-        if (obj.tool === 'raze_c_boombot') { drawRazeBoomBot(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
-        if (obj.tool === 'sage_c_wall') { drawSageWall(ctx, obj, imageCache, triggerRedraw, mapScale); return; }
-        if (obj.tool === 'sova_e_bolt') { drawSovaBolt(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'sova_x_blast') { drawSovaUlt(ctx, obj, mapScale); return; }
-        if (obj.tool === 'tejo_x_zone') { drawTejoUlt(ctx, obj, mapScale); return; }
-        if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) { drawVetoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'viper_e_wall') { drawViperWall(ctx, obj, mapScale); return; }
-        if (obj.tool === 'viper_x_zone') {drawViperUlt(ctx, obj, imageCache, triggerRedraw, mapScale); return;}
-        if (obj.tool === 'vyse_q_wall') { drawVyseWall(ctx, obj, mapScale); return; }
-        if (obj.tool === 'vyse_x_zone') { drawVyseUltZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); return; }
-        if (obj.tool === 'waylay_x_zone') { drawWaylayUlt(ctx, obj, mapScale); return; }
+        // --- ABILITIES VECTORIELLES ---
+        if (obj.tool === 'stun_zone') { drawBreachStun(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'breach_x_zone') { drawBreachUlt(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'breach_c_zone') { drawBreachAftershock(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'wall') { drawAstraWall(ctx, obj); ctx.restore(); return; }
+        if (obj.tool === 'brimstone_c_zone') { drawBrimstoneStim(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'brimstone_x_zone') { drawBrimstoneUlt(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'chamber_c_zone') { drawChamberTrademark(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'chamber_e_zone') { drawChamberRendezvous(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'cypher_c_wire') { drawCypherTrapwire(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'cypher_q_zone') { drawCypherCage(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'deadlock_c_wall') { drawDeadlockWall(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'deadlock_q_sensor') { drawDeadlockSensor(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'fade_x_zone') { drawFadeUlt(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'fade_e_zone') { drawFadeHaunt(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'fade_q_zone') { drawFadeSeize(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'gekko_q_wingman') { drawGekkoQ(ctx, obj, imageCache, triggerRedraw, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'harbor_x_zone') {drawHarborUlt(ctx, obj, mapScale); ctx.restore(); return; }
+        if (['iso_q_zone', 'iso_x_zone'].includes(obj.tool as string)) { drawIsoRect(ctx, obj); ctx.restore(); return; }
+        if (obj.tool === 'kayo_e_zone' || obj.tool === 'kayo_x_zone') { drawKayoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'killjoy_c_zone' || obj.tool === 'killjoy_q_zone' || obj.tool === 'killjoy_x_zone') { drawKilljoyZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'killjoy_e_turret') { drawKilljoyTurret(ctx, obj, imageCache, triggerRedraw, showZones,  mapScale); ctx.restore(); return; }
+        if (obj.tool === 'neon_c_wall') { drawNeonWall(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'neon_q_zone') { drawNeonStun(ctx, obj, imageCache, triggerRedraw, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'omen_q_zone') { drawOmenParanoia(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'raze_c_boombot') { drawRazeBoomBot(ctx, obj, imageCache, triggerRedraw, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'sage_c_wall') { drawSageWall(ctx, obj, imageCache, triggerRedraw, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'sova_e_bolt') { drawSovaBolt(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'sova_x_blast') { drawSovaUlt(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'tejo_x_zone') { drawTejoUlt(ctx, obj, mapScale); ctx.restore(); return; }
+        if (['veto_c_zone', 'veto_q_zone', 'veto_e_zone'].includes(obj.tool as string)) { drawVetoZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'viper_e_wall') { drawViperWall(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'viper_x_zone') {drawViperUlt(ctx, obj, imageCache, triggerRedraw, mapScale); ctx.restore(); return;}
+        if (obj.tool === 'vyse_q_wall') { drawVyseWall(ctx, obj, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'vyse_x_zone') { drawVyseUltZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
+        if (obj.tool === 'waylay_x_zone') { drawWaylayUlt(ctx, obj, mapScale); ctx.restore(); return; }
 
         // --- C. IMAGES CLASSIQUES ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
@@ -172,7 +178,7 @@ export const renderDrawings = (
                 const drawX = centerX - drawW / 2;
                 const drawY = centerY - drawH / 2;
 
-                ctx.save();
+                ctx.save(); // Save interne pour le clip
 
                 const isIconType = obj.subtype === 'icon';
                 const hasFrame = isAgent || (obj.imageSrc.includes('_icon') && !isIconType) || (obj.subtype === 'ability' && !obj.imageSrc.includes('_game'));
@@ -188,28 +194,30 @@ export const renderDrawings = (
                     const borderRadius = 6 * mapScale;
 
                     ctx.beginPath();
-                    // @ts-ignore
+
                     if (ctx.roundRect) ctx.roundRect(frameX, frameY, boxSize, boxSize, borderRadius);
                     else ctx.rect(frameX, frameY, boxSize, boxSize);
 
                     ctx.fillStyle = hexToRgba(agentColor, 0.8);
                     ctx.fill();
 
-                    ctx.save();
+                    ctx.save(); // Save pour le clip
                     ctx.clip();
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
-                    ctx.restore();
+                    ctx.restore(); // Restore clip
 
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 1.5 * mapScale;
                     ctx.shadowColor = '#000000';
                     ctx.shadowBlur = 4;
+                    // On s'assure que le cadre est solide
+                    ctx.setLineDash([]);
                     ctx.stroke();
                 } else {
                     ctx.drawImage(img, drawX, drawY, drawW, drawH);
                 }
 
-                ctx.restore();
+                ctx.restore(); // Restore save interne
 
                 if (draggingObjectId === obj.id) {
                     ctx.save();
@@ -220,10 +228,12 @@ export const renderDrawings = (
                     ctx.restore();
                 }
             }
+            ctx.restore(); // Restore save global
             return;
         }
 
-        // --- D. DESSIN VECTORIEL ---
+        // ---DESSIN VECTORIEL ---
+
         ctx.strokeStyle = obj.color;
         ctx.lineWidth = obj.thickness;
         ctx.lineCap = 'round';
@@ -265,5 +275,7 @@ export const renderDrawings = (
                 }
             }
         }
+
+        ctx.restore(); // Fin du bloc, on restaure pour le prochain
     });
 };
