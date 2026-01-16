@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient.ts'; // Vérifie le chemin
+import { supabase } from '../supabaseClient';
 import { useTeam, type TeamRole } from '../hooks/useTeam';
 import {
     ArrowLeft, LogOut, Camera, Loader2, Shield, PlusCircle,
-    Users, Trash2, Copy, Clipboard, Check // <--- Ajout de Check ici
+    Users, Trash2, Copy, Clipboard, Check
 } from 'lucide-react';
 
 export const Profile = () => {
@@ -95,7 +95,7 @@ export const Profile = () => {
 
         const res = await joinTeamByCode(joinCode.trim());
         if (res?.success) {
-            alert("Équipe rejointe avec succès !"); // Tu pourras remplacer ça aussi plus tard
+            alert("Équipe rejointe avec succès !");
             setJoinCode("");
         } else {
             alert(res?.error || "Code invalide");
@@ -107,25 +107,21 @@ export const Profile = () => {
         navigate('/login');
     };
 
-    // --- FONCTION MODIFIÉE : COPIE + NOTIF ---
     const copyInviteCode = () => {
         if (team?.invite_code) {
             navigator.clipboard.writeText(team.invite_code);
-
-            // Affiche la notification
             setShowToast(true);
-
-            // La cache après 3 secondes
             setTimeout(() => {
                 setShowToast(false);
             }, 3000);
         }
     };
 
-    if (loadingProfile) return <div className="min-h-screen bg-[#121212] flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>;
+    if (loadingProfile) return <div className="h-screen bg-[#121212] flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>;
 
     return (
-        <div className="min-h-screen bg-[#121212] text-white p-6 font-sans overflow-y-auto relative"> {/* Ajout de relative ici */}
+        // FIX 1: h-screen + overflow-hidden sur le parent, et le scroll sur l'enfant direct
+        <div className="h-screen bg-[#121212] text-white font-sans overflow-hidden flex flex-col relative">
 
             {/* --- NOTIFICATION TOAST --- */}
             {showToast && (
@@ -139,195 +135,199 @@ export const Profile = () => {
                 </div>
             )}
 
-            <div className="max-w-7xl mx-auto pb-10">
+            {/* Zone de contenu scrollable */}
+            <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-7xl mx-auto pb-20"> {/* Padding bottom large pour être sûr */}
 
-                <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors">
-                    <ArrowLeft size={20} /> Retour au Dashboard
-                </button>
+                    <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors">
+                        <ArrowLeft size={20} /> Retour au Dashboard
+                    </button>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch"> {/* items-stretch pour que les 2 cartes aient la même hauteur */}
 
-                    {/* --- COLONNE GAUCHE : PROFIL --- */}
-                    <div className="bg-[#1e2327] rounded-xl border border-gray-800 overflow-hidden shadow-2xl flex flex-col">
-                        <div className="h-32 bg-gradient-to-r from-blue-900 to-slate-900 shrink-0"></div>
-                        <div className="px-8 pb-8 flex-1 flex flex-col">
-                            <div className="relative -top-12 mb-2 flex justify-between items-end">
-                                <div className="relative group">
-                                    <div className="w-24 h-24 bg-[#121212] rounded-full p-1.5 inline-block">
-                                        {avatarUrl ?
-                                            <img src={avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover border-2 border-blue-600"/>
-                                            :
-                                            <div className="w-full h-full bg-blue-600 rounded-full flex items-center justify-center text-3xl font-bold uppercase">{username?.[0] || 'U'}</div>
-                                        }
+                        {/* --- COLONNE GAUCHE : PROFIL --- */}
+                        <div className="bg-[#1e2327] rounded-xl border border-gray-800 overflow-hidden shadow-2xl flex flex-col h-full">
+                            <div className="h-32 bg-gradient-to-r from-blue-900 to-slate-900 shrink-0"></div>
+                            <div className="px-8 pb-8 flex-1 flex flex-col">
+                                <div className="relative -top-12 mb-2 flex justify-between items-end">
+                                    <div className="relative group">
+                                        <div className="w-24 h-24 bg-[#121212] rounded-full p-1.5 inline-block">
+                                            {avatarUrl ?
+                                                <img src={avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover border-2 border-blue-600"/>
+                                                :
+                                                <div className="w-full h-full bg-blue-600 rounded-full flex items-center justify-center text-3xl font-bold uppercase">{username?.[0] || 'U'}</div>
+                                            }
+                                        </div>
+                                        <label className="absolute bottom-0 right-0 bg-gray-800 p-2 rounded-full cursor-pointer border border-gray-600 hover:bg-gray-700 transition-colors">
+                                            {uploading ? <Loader2 size={16} className="animate-spin"/> : <Camera size={16}/>}
+                                            <input type="file" className="hidden" accept="image/*" onChange={uploadAvatar} disabled={uploading}/>
+                                        </label>
                                     </div>
-                                    <label className="absolute bottom-0 right-0 bg-gray-800 p-2 rounded-full cursor-pointer border border-gray-600 hover:bg-gray-700 transition-colors">
-                                        {uploading ? <Loader2 size={16} className="animate-spin"/> : <Camera size={16}/>}
-                                        <input type="file" className="hidden" accept="image/*" onChange={uploadAvatar} disabled={uploading}/>
-                                    </label>
                                 </div>
+
+                                <h1 className="text-3xl font-bold -mt-10 mb-1">{username}</h1>
+                                <p className="text-gray-400 mb-6">Membre de Strat Planner</p>
+
+                                <button onClick={handleLogout} className="mt-auto border-t border-gray-800 pt-6 flex items-center gap-2 text-red-400 hover:text-red-300 w-full justify-center transition-colors"><LogOut size={20} /> Se déconnecter</button>
                             </div>
-
-                            <h1 className="text-3xl font-bold -mt-10 mb-1">{username}</h1>
-                            <p className="text-gray-400 mb-6">Membre de Strat Planner</p>
-
-                            <button onClick={handleLogout} className="mt-auto border-t border-gray-800 pt-6 flex items-center gap-2 text-red-400 hover:text-red-300 w-full justify-center transition-colors"><LogOut size={20} /> Se déconnecter</button>
                         </div>
-                    </div>
 
-                    {/* --- COLONNE DROITE : ÉQUIPE --- */}
-                    <div className="bg-[#1e2327] rounded-xl border border-gray-800 overflow-hidden shadow-2xl p-8 flex flex-col min-h-[600px]">
-                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-4">
-                            <Shield className="text-[#ff4655]" /> Gestion d'Équipe
-                        </h2>
+                        {/* --- COLONNE DROITE : ÉQUIPE --- */}
+                        {/* FIX 2: Suppression de min-h-[600px] rigide, utilisation de h-full */}
+                        <div className="bg-[#1e2327] rounded-xl border border-gray-800 overflow-hidden shadow-2xl p-8 flex flex-col h-full min-h-[500px]">
+                            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-4">
+                                <Shield className="text-[#ff4655]" /> Gestion d'Équipe
+                            </h2>
 
-                        {teamLoading ? (
-                            <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin text-gray-500" /></div>
-                        ) : team ? (
-                            <div className="flex flex-col h-full animate-in fade-in">
-                                {/* Header Équipe */}
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center border-2 border-gray-700 shadow-lg shrink-0">
-                                        <span className="text-xl font-black text-white tracking-widest">{team.tag}</span>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-2xl font-bold text-white leading-tight">{team.name}</h3>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded border uppercase font-bold tracking-wider inline-block mt-1 ${myRole === 'admin' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>
-                                            {myRole}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* LISTE DES MEMBRES */}
-                                <div className="mb-6 flex-1 flex flex-col min-h-0">
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2"><Users size={14}/> Membres ({members.length})</h4>
-
-                                    <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[300px]">
-                                        {members.map(member => (
-                                            <div key={member.id} className="flex items-center justify-between bg-[#121212] p-3 rounded-lg border border-gray-700">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden">
-                                                        {member.profile?.avatar_url ? (
-                                                            <img src={member.profile.avatar_url} alt={member.profile.username} className="w-full h-full object-cover"/>
-                                                        ) : (
-                                                            member.profile?.username?.[0] || '?'
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-bold text-white">{member.profile?.username || 'Inconnu'}</div>
-                                                        <div className={`text-[10px] uppercase font-bold ${member.role === 'admin' ? 'text-yellow-500' : 'text-gray-500'}`}>
-                                                            {member.role}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Actions Admin */}
-                                                {myRole === 'admin' && member.user_id !== user?.id && (
-                                                    <div className="flex items-center gap-2">
-                                                        <select
-                                                            value={member.role}
-                                                            onChange={(e) => updateMemberRole(member.id, e.target.value as TeamRole)}
-                                                            className="bg-gray-800 text-[10px] text-white border border-gray-600 rounded px-1 py-1 outline-none cursor-pointer hover:border-gray-500"
-                                                        >
-                                                            <option value="admin">ADMIN</option>
-                                                            <option value="coach">COACH</option>
-                                                            <option value="player">JOUEUR</option>
-                                                            <option value="guest">INVITÉ</option>
-                                                        </select>
-                                                        <button onClick={() => kickMember(member.id)} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded" title="Exclure"><Trash2 size={14}/></button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* NOUVEAU SYSTÈME D'INVITATION (CODE) */}
-                                {myRole === 'admin' && (
-                                    <div className="mt-auto border-t border-gray-800 pt-6">
-                                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
-                                            <Clipboard size={14}/> Code d'invitation
-                                        </h4>
-                                        <div className="bg-[#121212] p-4 rounded-lg border border-gray-700">
-                                            <p className="text-xs text-gray-400 mb-2">Partagez ce code pour recruter des joueurs :</p>
-                                            <div className="flex gap-2">
-                                                <code className="flex-1 bg-black/50 p-3 rounded border border-gray-800 text-blue-400 font-mono text-sm tracking-widest text-center overflow-hidden">
-                                                    {team.invite_code || "Chargement..."}
-                                                </code>
-                                                <button
-                                                    onClick={copyInviteCode}
-                                                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 active:scale-95 transform"
-                                                >
-                                                    {showToast ? <Check size={16}/> : <Copy size={16}/>} Copier
-                                                </button>
-                                            </div>
+                            {teamLoading ? (
+                                <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin text-gray-500" /></div>
+                            ) : team ? (
+                                <div className="flex flex-col flex-1 min-h-0 animate-in fade-in">
+                                    {/* Header Équipe */}
+                                    <div className="flex items-center gap-4 mb-8 shrink-0">
+                                        <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center border-2 border-gray-700 shadow-lg shrink-0">
+                                            <span className="text-xl font-black text-white tracking-widest">{team.tag}</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-white leading-tight">{team.name}</h3>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded border uppercase font-bold tracking-wider inline-block mt-1 ${myRole === 'admin' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>
+                                                {myRole}
+                                            </span>
                                         </div>
                                     </div>
-                                )}
 
-                                <button onClick={leaveTeam} className="mt-6 text-red-400 hover:text-red-300 text-sm flex items-center justify-center gap-2 w-full p-3 border border-red-900/30 rounded-lg hover:bg-red-900/10 transition-colors">
-                                    <LogOut size={16} /> Quitter l'équipe
-                                </button>
-                            </div>
-                        ) : (
-                            // MODE SANS ÉQUIPE
-                            !isCreatingTeam ? (
-                                <div className="text-center py-8 flex flex-col justify-center items-center h-full">
+                                    {/* LISTE DES MEMBRES */}
+                                    <div className="mb-6 flex-1 flex flex-col min-h-0">
+                                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2 shrink-0"><Users size={14}/> Membres ({members.length})</h4>
 
-                                    {/* Bloc CRÉATION */}
-                                    <div className="mb-10 w-full max-w-xs">
-                                        <div className="bg-gray-800 p-4 rounded-full mb-4 inline-block"><Shield size={32} className="text-gray-500" /></div>
-                                        <h3 className="text-lg font-bold text-white mb-2">Créer une squad</h3>
-                                        <p className="text-gray-400 text-xs mb-6">Devenez capitaine et invitez vos amis.</p>
-                                        <button onClick={() => setIsCreatingTeam(true)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all hover:scale-105">
-                                            <PlusCircle size={20} /> Créer une équipe
+                                        {/* FIX 3: Scrollbar Custom + flex-1 min-h-0 pour le scroll interne */}
+                                        <div className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0
+                                            [&::-webkit-scrollbar]:w-2
+                                            [&::-webkit-scrollbar-track]:bg-gray-900/50
+                                            [&::-webkit-scrollbar-thumb]:bg-gray-700
+                                            [&::-webkit-scrollbar-thumb]:rounded-full
+                                            [&::-webkit-scrollbar-thumb]:hover:bg-gray-600
+                                            [&::-webkit-scrollbar-track]:rounded-full">
+
+                                            {members.map(member => (
+                                                <div key={member.id} className="flex items-center justify-between bg-[#121212] p-3 rounded-lg border border-gray-700">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold overflow-hidden">
+                                                            {member.profile?.avatar_url ? (
+                                                                <img src={member.profile.avatar_url} alt={member.profile.username} className="w-full h-full object-cover"/>
+                                                            ) : (
+                                                                member.profile?.username?.[0] || '?'
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-bold text-white">{member.profile?.username || 'Inconnu'}</div>
+                                                            <div className={`text-[10px] uppercase font-bold ${member.role === 'admin' ? 'text-yellow-500' : 'text-gray-500'}`}>
+                                                                {member.role}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {myRole === 'admin' && member.user_id !== user?.id && (
+                                                        <div className="flex items-center gap-2">
+                                                            <select
+                                                                value={member.role}
+                                                                onChange={(e) => updateMemberRole(member.id, e.target.value as TeamRole)}
+                                                                className="bg-gray-800 text-[10px] text-white border border-gray-600 rounded px-1 py-1 outline-none cursor-pointer hover:border-gray-500"
+                                                            >
+                                                                <option value="admin">ADMIN</option>
+                                                                <option value="coach">COACH</option>
+                                                                <option value="player">JOUEUR</option>
+                                                                <option value="guest">INVITÉ</option>
+                                                            </select>
+                                                            <button onClick={() => kickMember(member.id)} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded" title="Exclure"><Trash2 size={14}/></button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* FOOTER: CODE + QUITTER */}
+                                    <div className="mt-auto border-t border-gray-800 pt-6 shrink-0">
+                                        {myRole === 'admin' && (
+                                            <div className="mb-4">
+                                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
+                                                    <Clipboard size={14}/> Code d'invitation
+                                                </h4>
+                                                <div className="bg-[#121212] p-4 rounded-lg border border-gray-700">
+                                                    <p className="text-xs text-gray-400 mb-2">Partagez ce code pour recruter des joueurs :</p>
+                                                    <div className="flex gap-2">
+                                                        <div className="flex-1 bg-black/50 p-3 rounded border border-gray-800 overflow-x-auto whitespace-nowrap
+                                                            [&::-webkit-scrollbar]:h-1.5
+                                                            [&::-webkit-scrollbar-track]:bg-transparent
+                                                            [&::-webkit-scrollbar-thumb]:bg-gray-700
+                                                            [&::-webkit-scrollbar-thumb]:rounded-full
+                                                            [&::-webkit-scrollbar-thumb]:hover:bg-gray-600">
+                                                            <code className="text-blue-400 font-mono text-sm tracking-widest">
+                                                                {team.invite_code || "Chargement..."}
+                                                            </code>
+                                                        </div>
+                                                        <button
+                                                            onClick={copyInviteCode}
+                                                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 active:scale-95 transform shrink-0"
+                                                        >
+                                                            {showToast ? <Check size={16}/> : <Copy size={16}/>} Copier
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <button onClick={leaveTeam} className="text-red-400 hover:text-red-300 text-sm flex items-center justify-center gap-2 w-full p-3 border border-red-900/30 rounded-lg hover:bg-red-900/10 transition-colors">
+                                            <LogOut size={16} /> Quitter l'équipe
                                         </button>
-                                    </div>
-
-                                    <div className="relative w-full max-w-xs mb-10">
-                                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-800"></div></div>
-                                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#1e2327] px-2 text-gray-500">OU</span></div>
-                                    </div>
-
-                                    {/* Bloc REJOINDRE */}
-                                    <div className="w-full max-w-xs">
-                                        <h3 className="text-sm font-bold text-white mb-3 text-left">Rejoindre via un code</h3>
-                                        <form onSubmit={handleJoinTeam} className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                required
-                                                placeholder="Collez le code ici..."
-                                                className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-3 text-white text-sm outline-none focus:border-blue-500 transition-colors placeholder-gray-600 font-mono"
-                                                value={joinCode}
-                                                onChange={e => setJoinCode(e.target.value)}
-                                            />
-                                            <button type="submit" className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-lg font-bold text-sm transition-colors border border-gray-600">
-                                                Go
-                                            </button>
-                                        </form>
                                     </div>
                                 </div>
                             ) : (
-                                // FORMULAIRE DE CRÉATION
-                                <form onSubmit={handleCreateTeam} className="flex flex-col h-full animate-in fade-in slide-in-from-right-4">
-                                    <h3 className="text-lg font-bold text-white mb-6">Nouvelle Équipe</h3>
-
-                                    <div className="space-y-6 flex-1">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nom</label>
-                                            <input type="text" required className="w-full bg-[#121212] border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none transition-colors" placeholder="Ex: Requiem Esports" value={newTeamName} onChange={e => setNewTeamName(e.target.value)}/>
+                                // MODE SANS ÉQUIPE
+                                !isCreatingTeam ? (
+                                    <div className="text-center py-8 flex flex-col justify-center items-center h-full">
+                                        <div className="mb-10 w-full max-w-xs">
+                                            <div className="bg-gray-800 p-4 rounded-full mb-4 inline-block"><Shield size={32} className="text-gray-500" /></div>
+                                            <h3 className="text-lg font-bold text-white mb-2">Créer une squad</h3>
+                                            <p className="text-gray-400 text-xs mb-6">Devenez capitaine et invitez vos amis.</p>
+                                            <button onClick={() => setIsCreatingTeam(true)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all hover:scale-105">
+                                                <PlusCircle size={20} /> Créer une équipe
+                                            </button>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tag (2-4 char)</label>
-                                            <input type="text" required minLength={2} maxLength={4} className="w-full bg-[#121212] border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none uppercase tracking-widest transition-colors" placeholder="RQM" value={newTeamTag} onChange={e => setNewTeamTag(e.target.value.toUpperCase())}/>
+                                        <div className="relative w-full max-w-xs mb-10">
+                                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-800"></div></div>
+                                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#1e2327] px-2 text-gray-500">OU</span></div>
+                                        </div>
+                                        <div className="w-full max-w-xs">
+                                            <h3 className="text-sm font-bold text-white mb-3 text-left">Rejoindre via un code</h3>
+                                            <form onSubmit={handleJoinTeam} className="flex gap-2">
+                                                <input type="text" required placeholder="Collez le code ici..." className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-3 text-white text-sm outline-none focus:border-blue-500 transition-colors placeholder-gray-600 font-mono" value={joinCode} onChange={e => setJoinCode(e.target.value)} />
+                                                <button type="submit" className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-lg font-bold text-sm transition-colors border border-gray-600">Go</button>
+                                            </form>
                                         </div>
                                     </div>
-                                    <div className="flex gap-4 mt-8">
-                                        <button type="button" onClick={() => {setIsCreatingTeam(false);}} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors">Annuler</button>
-                                        <button type="submit" className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors shadow-lg shadow-blue-900/20">Confirmer</button>
-                                    </div>
-                                </form>
-                            )
-                        )}
+                                ) : (
+                                    <form onSubmit={handleCreateTeam} className="flex flex-col h-full animate-in fade-in slide-in-from-right-4">
+                                        <h3 className="text-lg font-bold text-white mb-6">Nouvelle Équipe</h3>
+                                        <div className="space-y-6 flex-1">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nom</label>
+                                                <input type="text" required className="w-full bg-[#121212] border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none transition-colors" placeholder="Ex: Requiem Esports" value={newTeamName} onChange={e => setNewTeamName(e.target.value)}/>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tag (2-4 char)</label>
+                                                <input type="text" required minLength={2} maxLength={4} className="w-full bg-[#121212] border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none uppercase tracking-widest transition-colors" placeholder="RQM" value={newTeamTag} onChange={e => setNewTeamTag(e.target.value.toUpperCase())}/>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-4 mt-8">
+                                            <button type="button" onClick={() => {setIsCreatingTeam(false);}} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors">Annuler</button>
+                                            <button type="submit" className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors shadow-lg shadow-blue-900/20">Confirmer</button>
+                                        </div>
+                                    </form>
+                                )
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
