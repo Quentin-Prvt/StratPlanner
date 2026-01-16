@@ -2,10 +2,18 @@ import React, { useState } from 'react';
 import {
     Pencil, Eraser, Minus, MoveUpRight, ArrowBigRightDash, Square,
     Hand, MousePointer2, Settings, Hammer, Type, Trash2, FolderOpen, RefreshCcw,
-    RotateCw, MessageSquareText, UserX, ZapOff, XCircle
+    RotateCw, MessageSquareText, UserX, ZapOff, XCircle, FileText, Plus, ExternalLink
 } from 'lucide-react';
 
 import type { ToolType, StrokeType } from '../types/canvas';
+
+
+interface StrategyRef {
+    id: string;
+    title: string;
+    folder_id: number | null;
+    map_name: string;
+}
 
 interface ToolsSidebarProps {
     currentTool: ToolType | 'tools' | 'settings' | 'text'| null;
@@ -47,6 +55,12 @@ interface ToolsSidebarProps {
     currentFolderId: string;
     onFolderChange: (folderId: string) => void;
     onDeleteStrategy: () => void;
+
+    // --- NOUVELLES PROPS ---
+    strategies: StrategyRef[]; // Liste de toutes les stratégies pour filtrer
+    currentStrategyId: string; // Pour savoir laquelle est active
+    onNavigate: (id: string) => void; // Pour changer de page
+    onCreateInFolder: () => void; // Pour créer dans ce dossier
 }
 
 export const ToolsSidebar = ({
@@ -68,7 +82,10 @@ export const ToolsSidebar = ({
                                  onClearText,
                                  onClearDrawings,
 
-                                 folders, currentFolderId, onFolderChange, onDeleteStrategy
+                                 folders, currentFolderId, onFolderChange, onDeleteStrategy,
+
+                                 // Nouvelles props
+                                 strategies, currentStrategyId, onNavigate, onCreateInFolder
                              }: ToolsSidebarProps) => {
 
     const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
@@ -109,12 +126,16 @@ export const ToolsSidebar = ({
         }`;
     };
 
+    // --- FILTRAGE DES STRATÉGIES DU DOSSIER COURANT ---
+    const filteredStrategies = strategies.filter(s => {
+        if (currentFolderId === "") return s.folder_id === null;
+        return s.folder_id?.toString() === currentFolderId;
+    });
+
     return (
         <div className="
             flex flex-col gap-4 p-4 bg-[#1e293b] rounded-xl border border-gray-700 shadow-xl w-full lg:w-72 text-white
             overflow-y-auto max-h-full pointer-events-auto
-
-            {/* --- SCROLLBAR STYLE COPIÉ DU MAPSELECTOR --- */}
             [&::-webkit-scrollbar]:w-2
             [&::-webkit-scrollbar-track]:bg-transparent
             [&::-webkit-scrollbar-thumb]:bg-gray-700
@@ -181,14 +202,13 @@ export const ToolsSidebar = ({
                 </div>
             )}
 
-            {/* PARAMÈTRES */}
+            {/* PARAMÈTRES (ORGANISATION & NAVIGATION) */}
             {currentTool === 'settings' && (
                 <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-left-4 duration-300 bg-slate-800 p-3 rounded-lg border border-slate-700">
                     <span className="text-sm font-medium text-gray-400 border-b border-gray-700 pb-2">Affichage</span>
 
                     <button onClick={() => setShowZones(!showZones)} className={`w-full flex items-center justify-between px-3 py-2 rounded transition-colors ${showZones ? 'bg-gray-700 text-white' : 'bg-slate-900 text-gray-400 hover:bg-slate-700'}`}><span className="text-xs font-bold uppercase">Zones de portée</span><div className={`w-3 h-3 rounded-full transition-all ${showZones ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-gray-600'}`} /></button>
 
-                    {/* TOGGLE CALLS */}
                     <button onClick={() => setShowMapCalls(!showMapCalls)} className={`w-full flex items-center justify-between px-3 py-2 rounded transition-colors ${showMapCalls ? 'bg-gray-700 text-white' : 'bg-slate-900 text-gray-400 hover:bg-slate-700'}`}>
                         <div className="flex items-center gap-2"><MessageSquareText size={14} /><span className="text-xs font-bold uppercase">Afficher Calls</span></div>
                         <div className={`w-3 h-3 rounded-full transition-all ${showMapCalls ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-gray-600'}`} />
@@ -199,65 +219,60 @@ export const ToolsSidebar = ({
                     {/* NETTOYAGE RAPIDE */}
                     <div className="flex flex-col gap-2 pt-2 border-t border-gray-700">
                         <span className="text-xs font-bold uppercase text-gray-500 mb-1">Nettoyage Rapide</span>
-
                         <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={() => handleSafeAction('agents', onClearAgents)}
-                                className={getDeleteButtonStyle('agents')}
-                                title="Supprimer tous les agents"
-                            >
-                                <UserX size={14} />
-                                {confirmTarget === 'agents' ? "Confirmer ?" : "Agents"}
-                            </button>
+                            <button onClick={() => handleSafeAction('agents', onClearAgents)} className={getDeleteButtonStyle('agents')} title="Supprimer tous les agents"><UserX size={14} />{confirmTarget === 'agents' ? "Confirmer ?" : "Agents"}</button>
+                            <button onClick={() => handleSafeAction('abilities', onClearAbilities)} className={getDeleteButtonStyle('abilities')} title="Supprimer tous les sorts"><ZapOff size={14} />{confirmTarget === 'abilities' ? "Confirmer ?" : "Sorts"}</button>
+                            <button onClick={() => handleSafeAction('drawings', onClearDrawings)} className={getDeleteButtonStyle('drawings')} title="Supprimer tous les dessins"><Pencil size={14} />{confirmTarget === 'drawings' ? "Confirmer ?" : "Dessins"}</button>
+                            <button onClick={() => handleSafeAction('text', onClearText)} className={getDeleteButtonStyle('text')} title="Supprimer tous les textes"><Type size={14} />{confirmTarget === 'text' ? "Confirmer ?" : "Textes"}</button>
+                        </div>
+                        <button onClick={() => handleSafeAction('all', onClearAll)} className={`flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-xs transition-all mt-1 border ${confirmTarget === 'all' ? 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse border-orange-500' : 'bg-red-900/30 border-red-900/50 hover:bg-red-900/50 text-red-200'}`}>{confirmTarget === 'all' ? <RefreshCcw size={14} className="animate-spin" /> : <Trash2 size={14} />}{confirmTarget === 'all' ? "CONFIRMER TOUT EFFACER ?" : "Tout effacer (Reset)"}</button>
+                    </div>
 
-                            <button
-                                onClick={() => handleSafeAction('abilities', onClearAbilities)}
-                                className={getDeleteButtonStyle('abilities')}
-                                title="Supprimer tous les sorts"
-                            >
-                                <ZapOff size={14} />
-                                {confirmTarget === 'abilities' ? "Confirmer ?" : "Sorts"}
-                            </button>
+                    {/* ORGANISATION & NAVIGATION */}
+                    <div className="flex flex-col gap-3 pt-2 border-t border-gray-700">
+                        <span className="text-sm font-medium text-gray-400 pb-1">Organisation</span>
 
-                            <button
-                                onClick={() => handleSafeAction('drawings', onClearDrawings)}
-                                className={getDeleteButtonStyle('drawings')}
-                                title="Supprimer tous les dessins"
-                            >
-                                <Pencil size={14} />
-                                {confirmTarget === 'drawings' ? "Confirmer ?" : "Dessins"}
-                            </button>
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2"><FolderOpen size={12} /> Dossier actuel</label>
+                            <select value={currentFolderId} onChange={(e) => onFolderChange(e.target.value)} className="w-full bg-slate-900 text-white text-sm rounded-lg border border-slate-700 p-2 focus:ring-2 focus:ring-blue-500 outline-none hover:bg-slate-800">
+                                <option value="">Aucun dossier</option>
+                                {folders.map((folder) => (<option key={folder.id} value={folder.id}>{folder.name}</option>))}
+                            </select>
+                        </div>
 
+                        {/* --- LISTE DES AUTRES STRATÉGIES DU DOSSIER --- */}
+                        <div className="flex flex-col gap-1.5 mt-1">
+                            <label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                <FileText size={12} /> Autres stratégies
+                            </label>
+
+                            <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 custom-scrollbar">
+                                {filteredStrategies.length <= 1 ? (
+                                    <span className="text-xs text-gray-500 italic p-1">Aucune autre stratégie</span>
+                                ) : (
+                                    filteredStrategies.map(strat => (
+                                        <button
+                                            key={strat.id}
+                                            onClick={() => onNavigate(strat.id)}
+                                            className={`text-left text-xs px-2 py-1.5 rounded truncate flex items-center justify-between group ${strat.id === currentStrategyId ? 'bg-blue-600/20 text-blue-400 font-bold border border-blue-500/30' : 'text-gray-400 hover:bg-slate-700 hover:text-white'}`}
+                                        >
+                                            <span className="truncate">{strat.title || "Sans titre"}</span>
+                                            {strat.id !== currentStrategyId && <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity"/>}
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* BOUTON CRÉER DANS LE DOSSIER */}
                             <button
-                                onClick={() => handleSafeAction('text', onClearText)}
-                                className={getDeleteButtonStyle('text')}
-                                title="Supprimer tous les textes"
+                                onClick={onCreateInFolder}
+                                className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white py-1.5 rounded-lg font-medium text-xs transition-colors border border-slate-600 hover:border-slate-500 mt-1"
                             >
-                                <Type size={14} />
-                                {confirmTarget === 'text' ? "Confirmer ?" : "Textes"}
+                                <Plus size={14} /> Nouvelle stratégie ici
                             </button>
                         </div>
 
-                        {/* BOUTON TOUT EFFACER PRINCIPAL */}
-                        <button
-                            onClick={() => handleSafeAction('all', onClearAll)}
-                            className={`flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-xs transition-all mt-1 border ${
-                                confirmTarget === 'all'
-                                    ? 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse border-orange-500'
-                                    : 'bg-red-900/30 border-red-900/50 hover:bg-red-900/50 text-red-200'
-                            }`}
-                        >
-                            {confirmTarget === 'all' ? <RefreshCcw size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                            {confirmTarget === 'all' ? "CONFIRMER TOUT EFFACER ?" : "Tout effacer (Reset)"}
-                        </button>
-                    </div>
-
-                    {/* ORGANISATION */}
-                    <div className="flex flex-col gap-3 pt-2 border-t border-gray-700">
-                        <span className="text-sm font-medium text-gray-400 pb-1">Organisation</span>
-                        <div className="flex flex-col gap-1.5"><label className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2"><FolderOpen size={12} /> Dossier</label><select value={currentFolderId} onChange={(e) => onFolderChange(e.target.value)} className="w-full bg-slate-900 text-white text-sm rounded-lg border border-slate-700 p-2 focus:ring-2 focus:ring-blue-500 outline-none hover:bg-slate-800"><option value="">Aucun dossier</option>{folders.map((folder) => (<option key={folder.id} value={folder.id}>{folder.name}</option>))}</select></div>
-
-                        <button onClick={onDeleteStrategy} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-red-900/20 mt-2"><XCircle size={16} /> Supprimer la stratégie</button>
+                        <button onClick={onDeleteStrategy} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium text-sm transition-colors shadow-lg shadow-red-900/20 mt-4 border border-red-500"><XCircle size={16} /> Supprimer la stratégie</button>
                     </div>
                 </div>
             )}

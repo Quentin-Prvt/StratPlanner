@@ -27,7 +27,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
         reverseMapError, setReverseMapError,
         reverseCallsError, setReverseCallsError,
-        isLoading, showLoadModal, setShowLoadModal, savedStrategies,
+        isLoading, showLoadModal, setShowLoadModal, savedStrategies,handleNavigateToStrategy, handleCreateInFolder,
         isTextModalOpen, setIsTextModalOpen,
         showDeleteModal, setShowDeleteModal,
         editingObj, setEditingTextId,
@@ -84,6 +84,10 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     onClearDrawings={handleClearDrawings}
                     isRotated={isRotated} setIsRotated={setIsRotated}
                     showMapCalls={showMapCalls} setShowMapCalls={setShowMapCalls}
+                    strategies={savedStrategies}
+                    currentStrategyId={strategyId}
+                    onNavigate={handleNavigateToStrategy}
+                    onCreateInFolder={handleCreateInFolder}
                 />
             </div>
 

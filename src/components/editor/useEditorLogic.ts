@@ -11,7 +11,7 @@ import { renderDrawings } from '../../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../../utils/dropFactory';
 import { MAP_CONFIGS } from '../../utils/mapsRegistry';
 import type { DrawingObject, ToolType, StrokeType, StrategyStep } from '../../types/canvas';
-import { useAuth } from '../../contexts/AuthContext'; // Extension .tsx retirée (standard)
+import { useAuth } from '../../contexts/AuthContext';
 
 // Helper ID
 const generateId = () => Date.now() + Math.random();
@@ -148,12 +148,22 @@ export const useEditorLogic = (strategyId: string) => {
         fetchFolders();
     }, []);
 
+    // --- FIX CHARGEMENT DONNÉES ---
     useEffect(() => {
         const loadInitialData = async () => {
             if (!strategyId) return;
             const data = await getStrategyById(strategyId);
             if (data) {
                 if (data.folder_id) setCurrentFolderId(data.folder_id.toString());
+
+                // IMPORTANT: On charge les autres stratégies SEULEMENT si user est prêt.
+                // Sinon, ce fetch échouera silencieusement.
+                // En ajoutant 'user' et 'fetchStrategies' aux dépendances, ce bloc se relancera
+                // dès que l'auth sera confirmée.
+                if (user) {
+                    fetchStrategies(data.team_id);
+                }
+
                 if (data.map_name) {
                     const mapKey = data.map_name.toLowerCase();
                     const mapConfig = MAP_CONFIGS[mapKey];
@@ -171,10 +181,12 @@ export const useEditorLogic = (strategyId: string) => {
             setIsLoaded(true);
         };
         loadInitialData();
-    }, [strategyId]);
+
+        // AJOUT DES DÉPENDANCES CRITIQUES ICI : [strategyId, fetchStrategies, user]
+        // Cela force le re-run quand l'utilisateur est authentifié.
+    }, [strategyId, fetchStrategies, user]);
 
     // --- REALTIME ---
-    // Modification ici : Ajout de user, broadcastCursor, remoteCursors
     const { broadcastMove, broadcastCursor, remoteCursors } = useRealtimeStrategy(
         strategyId,
         user,
@@ -758,6 +770,7 @@ export const useEditorLogic = (strategyId: string) => {
         }
     };
 
+    // --- STEP ACTIONS ---
     const handleAddStep = () => {
         setSteps(prevSteps => {
             const newSteps = [...prevSteps, { id: generateId().toString(), name: `Phase ${prevSteps.length + 1}`, data: [] }];
@@ -808,6 +821,20 @@ export const useEditorLogic = (strategyId: string) => {
         });
     };
 
+    // --- NAVIGATION INTER-STRATÉGIES ---
+    const handleNavigateToStrategy = (id: string) => {
+        navigate(`/editor/${id}`);
+    };
+
+    const handleCreateInFolder = () => {
+        if (currentFolderId) {
+            navigate(`/create?folderId=${currentFolderId}`);
+        } else {
+            navigate('/create');
+        }
+    };
+
+    // --- FILE ACTIONS ---
     const handleFolderChange = async (newFolderId: string) => {
         setCurrentFolderId(newFolderId);
         if (strategyId) {
@@ -866,6 +893,8 @@ export const useEditorLogic = (strategyId: string) => {
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
         handleFolderChange, handleDeleteRequest: () => setShowDeleteModal(true), confirmDelete,
         fetchStrategies,
-        remoteCursors, // Retourne les curseurs des autres utilisateurs
+        remoteCursors,
+        handleNavigateToStrategy,
+        handleCreateInFolder
     };
 };
