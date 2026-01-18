@@ -12,6 +12,7 @@ import { createDrawingFromDrop } from '../../utils/dropFactory';
 import { MAP_CONFIGS } from '../../utils/mapsRegistry';
 import type { DrawingObject, ToolType, StrokeType, StrategyStep } from '../../types/canvas';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUndoRedo } from '../../hooks/useUndoRedo';
 
 // Helper ID
 const generateId = () => Date.now() + Math.random();
@@ -40,9 +41,14 @@ export const useEditorLogic = (strategyId: string) => {
     // --- STATE REFS ---
     const drawingsRef = useRef<DrawingObject[]>([]);
 
+    const startHistoryRef = useRef<DrawingObject[]>([]);
+
     // Realtime Refs
     const isInteractingRef = useRef(false);
     const isRemoteUpdate = useRef(false);
+
+    // Historique
+    const { addToHistory, undo, redo } = useUndoRedo();
 
     // Drawing Refs
     const pointsRef = useRef<{x: number, y: number}[]>([]);
@@ -97,6 +103,53 @@ export const useEditorLogic = (strategyId: string) => {
         currentStepIndexRef.current = index;
         setCurrentStepIndexState(index);
     };
+
+    const applyHistoryState = (newState: DrawingObject[]) => {
+        // 1. Mettre à jour la Ref (pour la fluidité immédiate)
+        drawingsRef.current = newState;
+
+        // 2. Redessiner
+        redrawMainCanvas();
+
+        // 3. Mettre à jour le State React et la DB
+        setSteps(prev => {
+            const newSteps = [...prev];
+            if (newSteps[currentStepIndex]) {
+                newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newState };
+            }
+            // On force la sauvegarde DB immédiate pour synchroniser tout le monde
+            immediateSave(newSteps);
+            return newSteps;
+        });
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignorer si on écrit dans un input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    // REDO (Ctrl + Shift + Z)
+                    const nextState = redo(drawingsRef.current);
+                    if (nextState) applyHistoryState(nextState);
+                } else {
+                    // UNDO (Ctrl + Z)
+                    const prevState = undo(drawingsRef.current);
+                    if (prevState) applyHistoryState(prevState);
+                }
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                // REDO (Ctrl + Y)
+                e.preventDefault();
+                const nextState = redo(drawingsRef.current);
+                if (nextState) applyHistoryState(nextState);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undo, redo, currentStepIndex]);
 
     const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
 
@@ -156,10 +209,6 @@ export const useEditorLogic = (strategyId: string) => {
             if (data) {
                 if (data.folder_id) setCurrentFolderId(data.folder_id.toString());
 
-                // IMPORTANT: On charge les autres stratégies SEULEMENT si user est prêt.
-                // Sinon, ce fetch échouera silencieusement.
-                // En ajoutant 'user' et 'fetchStrategies' aux dépendances, ce bloc se relancera
-                // dès que l'auth sera confirmée.
                 if (user) {
                     fetchStrategies(data.team_id);
                 }
@@ -182,8 +231,6 @@ export const useEditorLogic = (strategyId: string) => {
         };
         loadInitialData();
 
-        // AJOUT DES DÉPENDANCES CRITIQUES ICI : [strategyId, fetchStrategies, user]
-        // Cela force le re-run quand l'utilisateur est authentifié.
     }, [strategyId, fetchStrategies, user]);
 
     // --- REALTIME ---
@@ -302,6 +349,7 @@ export const useEditorLogic = (strategyId: string) => {
     // --- MOUSE HANDLERS ---
     const handleMouseDown = (e: React.MouseEvent) => {
         isInteractingRef.current = true;
+        startHistoryRef.current = JSON.parse(JSON.stringify(drawingsRef.current));
 
         const currentScale = transformRef.current.scale;
         const isMinZoom = currentScale <= 0.501; // Petite marge de sécurité
@@ -480,7 +528,7 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleMouseUp = () => {
-        // --- CAS 1: POUBELLE ---
+        // ---  POUBELLE ---
         if (draggingObjectId !== null && isOverTrash) {
             const updatedDrawings = drawingsRef.current.filter(obj => obj.id !== draggingObjectId);
             drawingsRef.current = updatedDrawings;
@@ -502,7 +550,14 @@ export const useEditorLogic = (strategyId: string) => {
             return;
         }
 
-        // --- CAS 2: FIN DRAG ---
+        // --- HISTORIQUE ---
+        if (isDrawing || draggingObjectId !== null) {
+            if (JSON.stringify(startHistoryRef.current) !== JSON.stringify(drawingsRef.current)) {
+                addToHistory(startHistoryRef.current);
+            }
+        }
+
+        // ---  FIN DRAG ---
         if (draggingObjectId !== null) {
             const finalData = [...drawingsRef.current];
             setSteps(prev => {
@@ -565,6 +620,7 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleClearAll = () => {
+        addToHistory(drawingsRef.current);
         drawingsRef.current = [];
         redrawMainCanvas();
         setCurrentTool('cursor');
@@ -667,6 +723,7 @@ export const useEditorLogic = (strategyId: string) => {
                 if (checkAbilityHit(pos, obj, mapScale)) hit = true;
             }
             if (hit) {
+                addToHistory(drawingsRef.current);
                 currentList.splice(i, 1);
                 hasDeleted = true;
                 break;
@@ -696,6 +753,7 @@ export const useEditorLogic = (strategyId: string) => {
             const img = imgRef.current; if (!img) return;
             const finalX = clamp(x, 0, img.clientWidth);
             const finalY = clamp(y, 0, img.clientHeight);
+            addToHistory(drawingsRef.current);
             const newObj = createDrawingFromDrop(type, name, finalX, finalY);
 
             if (newObj) {
@@ -719,6 +777,7 @@ export const useEditorLogic = (strategyId: string) => {
     const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
         const newId = generateId();
         let currentList = [...drawingsRef.current];
+        addToHistory(drawingsRef.current);
         if (editingTextId !== null) {
             currentList = currentList.map(obj => obj.id === editingTextId ? { ...obj, text: data.text, color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal', fontStyle: data.isItalic ? 'italic' : 'normal' } : obj);
             setEditingTextId(null);

@@ -77,11 +77,10 @@ export const drawChamberTrademark = (
 export const checkChamberTrademarkHit = (
     pos: { x: number, y: number },
     obj: DrawingObject,
-    mapScale: number = 1.0
 ): { mode: 'center', offset?: { x: number, y: number } } | null => {
     const center = obj.points[0];
-    const radius = ABILITY_SIZES['chamber_c_radius'] * mapScale;
-    if (Math.hypot(pos.x - center.x, pos.y - center.y) < radius) {
+    const HITBOX_RADIUS = 30;
+    if (Math.hypot(pos.x - center.x, pos.y - center.y) < HITBOX_RADIUS) {
         return { mode: 'center', offset: { x: pos.x - center.x, y: pos.y - center.y } };
     }
     return null;
