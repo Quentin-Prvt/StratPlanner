@@ -1,4 +1,4 @@
-import type { DrawingObject } from '../types/canvas';
+import type { DrawingObject, VisionObject } from '../types/canvas';
 
 // --- IMPORTS LOGIQUE ABILITÉS ---
 import { checkBreachStunHit, updateBreachStunPosition } from './abilities/breachStun';
@@ -33,6 +33,7 @@ import { checkWaylayHit, updateWaylayPosition } from './abilities/waylayAbilitie
 import { checkHarborUltHit, updateHarborUltPosition } from './abilities/harborUlt';
 import {checkViperUltHit, updateViperUltPosition} from "./abilities/viperUlt.ts";
 
+const distSq = (x1: number, y1: number, x2: number, y2: number) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
 
 export interface HitResult {
     id: number;
@@ -122,4 +123,36 @@ export const updateAbilityPosition = (
     if (obj.tool === 'waylay_x_zone') return updateWaylayPosition(obj, pos, specialDragMode as any, dragOffset);
 
     return obj;
+};
+
+export const checkVisionHit = (
+    pos: { x: number, y: number },
+    obj: VisionObject,
+    mapScale: number
+): { id: number, mode: 'move' | 'rotate', offset?: { x: number, y: number } } | null => {
+
+    const handleRadiusSq = (15) ** 2; // Zone de clic de 15px autour des points
+
+    // 1. Vérifier Poignée Centrale (Point Blanc -> MOVE)
+    if (distSq(pos.x, pos.y, obj.x, obj.y) < handleRadiusSq) {
+        return {
+            id: obj.id,
+            mode: 'move',
+            offset: { x: pos.x - obj.x, y: pos.y - obj.y }
+        };
+    }
+
+    // 2. Vérifier Poignée Rotation (Losange Rouge -> ROTATE)
+    const handleX = obj.x + Math.cos(obj.rotation) * (obj.radius * mapScale);
+    const handleY = obj.y + Math.sin(obj.rotation) * (obj.radius * mapScale);
+
+    if (distSq(pos.x, pos.y, handleX, handleY) < handleRadiusSq) {
+        return {
+            id: obj.id,
+            mode: 'rotate'
+            // Pas d'offset pour la rotation
+        };
+    }
+
+    return null;
 };

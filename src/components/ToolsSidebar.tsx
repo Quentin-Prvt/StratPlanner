@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
     Pencil, Eraser, Minus, MoveUpRight, ArrowBigRightDash, Square,
     Hand, MousePointer2, Settings, Hammer, Type, Trash2, FolderOpen, RefreshCcw,
-    RotateCw, MessageSquareText, UserX, ZapOff, XCircle, FileText, Plus, ExternalLink
+    RotateCw, MessageSquareText, UserX, ZapOff, XCircle, FileText, Plus, ExternalLink,
+    Eye
 } from 'lucide-react';
 
 import type { ToolType, StrokeType } from '../types/canvas';
@@ -57,10 +58,10 @@ interface ToolsSidebarProps {
     onDeleteStrategy: () => void;
 
     // --- NOUVELLES PROPS ---
-    strategies: StrategyRef[]; // Liste de toutes les stratégies pour filtrer
-    currentStrategyId: string; // Pour savoir laquelle est active
-    onNavigate: (id: string) => void; // Pour changer de page
-    onCreateInFolder: () => void; // Pour créer dans ce dossier
+    strategies: StrategyRef[];
+    currentStrategyId: string;
+    onNavigate: (id: string) => void;
+    onCreateInFolder: () => void;
 }
 
 export const ToolsSidebar = ({
@@ -93,7 +94,15 @@ export const ToolsSidebar = ({
     const colors = ['#ffffff', '#000000', '#ef4444', '#ec4899', '#facc15', '#84cc16', '#14532d', '#3b82f6', '#8b5cf6', '#713f12'];
     const agents = ['astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock', 'fade', 'gekko', 'harbor', 'iso', 'jett', 'kayo', 'killjoy', 'neon', 'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova','tejo','veto', 'viper', 'vyse','waylay', 'yoru'];
     const abilities = ['c', 'q', 'e', 'x'];
-    const mapIcons = [{ id: 'danger', label: 'Danger', src: '/icons/danger.png' }, { id: 'star', label: 'Important', src: '/icons/star.png' }, { id: 'target', label: 'Cible', src: '/icons/target.png' }, { id: 'spike', label: 'Spike', src: '/icons/spike.png' }];
+
+    // Ajout de l'icône Vision ici avec le composant Eye
+    const mapIcons = [
+        { id: 'vision', label: 'Vision', icon: <Eye size={24} className="text-blue-400" /> },
+        { id: 'danger', label: 'Danger', src: '/icons/danger.png' },
+        { id: 'star', label: 'Important', src: '/icons/star.png' },
+        { id: 'target', label: 'Cible', src: '/icons/target.png' },
+        { id: 'spike', label: 'Spike', src: '/icons/spike.png' }
+    ];
 
     const handleToolClick = (tool: any) => currentTool === tool ? setTool(null) : setTool(tool);
     const activatePen = () => { setTool('pen'); setThickness(4); };
@@ -193,12 +202,39 @@ export const ToolsSidebar = ({
                 </div>
             )}
 
-            {/* OUTILS */}
+            {/* OUTILS - MODIFIÉ POUR GÉRER L'ICÔNE VISION */}
             {(currentTool === 'tools' || currentTool === 'text') && (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-300 bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-3">
                     <span className="text-sm font-medium text-gray-400 border-b border-gray-700 pb-2">Outils tactiques</span>
                     <button onClick={() => setTool('text')} className={`flex items-center justify-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-all ${currentTool === 'text' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-gray-300 hover:bg-slate-700 hover:text-white'}`}><Type size={18} /> Zone de Texte</button>
-                    <div className="flex flex-col gap-2 mt-1"><span className="text-xs font-medium text-gray-500 uppercase">Objets (Glisser-déposer)</span><div className="grid grid-cols-4 gap-2">{mapIcons.map((icon) => (<div key={icon.id} draggable onDragStart={(e) => handleDragStart(e, 'icon', icon.id)} className="aspect-square bg-slate-900 p-2 rounded-lg border border-slate-700 hover:border-blue-500 hover:bg-slate-800 cursor-grab active:cursor-grabbing transition-all flex items-center justify-center group relative" title={icon.label}><img src={icon.src} alt={icon.label} className="w-full h-full object-contain pointer-events-none drop-shadow-md" onError={(e) => {e.currentTarget.style.display = 'none'}} /><span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">{icon.label}</span></div>))}</div></div>
+
+                    <div className="flex flex-col gap-2 mt-1">
+                        <span className="text-xs font-medium text-gray-500 uppercase">Objets (Glisser-déposer)</span>
+                        <div className="grid grid-cols-4 gap-2">
+                            {mapIcons.map((iconItem) => (
+                                <div
+                                    key={iconItem.id}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, 'icon', iconItem.id)}
+                                    className="aspect-square bg-slate-900 p-2 rounded-lg border border-slate-700 hover:border-blue-500 hover:bg-slate-800 cursor-grab active:cursor-grabbing transition-all flex items-center justify-center group relative"
+                                    title={iconItem.label}
+                                >
+                                    {/* CONDITION : Si on a une icône React, on l'affiche, sinon on affiche l'image SRC */}
+                                    {iconItem.icon ? (
+                                        iconItem.icon
+                                    ) : (
+                                        <img
+                                            src={iconItem.src}
+                                            alt={iconItem.label}
+                                            className="w-full h-full object-contain pointer-events-none drop-shadow-md"
+                                            onError={(e) => {e.currentTarget.style.display = 'none'}}
+                                        />
+                                    )}
+                                    <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">{iconItem.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 

@@ -9,10 +9,13 @@ export const createDrawingFromDrop = (
 ): DrawingObject | null => {
     const id = Date.now();
 
+
+
+
+
     // =========================================================================
     // 1. GESTION DES COMPÉTENCES SPÉCIFIQUES (Zones, Murs, Lignes...)
     // =========================================================================
-
     // --- ASTRA ---
     if (name === 'astra_x') return {
         id,
@@ -563,6 +566,22 @@ export const createDrawingFromDrop = (
     // 2. GESTION DES ICÔNES DROPPABLES (Danger, Star, Target, Spike...)
     // =========================================================================
     // C'est ici que l'on ajoute le nouveau type
+
+    if (type === 'icon' && name === 'vision') {
+        return {
+            id: Date.now(),
+            tool: 'vision',
+            x,
+            y,
+            rotation: 0,      // Orientation par défaut (0 radians = droite)
+            radius: 100,      // Longueur du cône de vision
+            color: '#3b82f6', // Bleu
+            thickness: 2,
+            opacity: 0.4,     // Semi-transparent
+            points: []        // Requis par le type DrawingObject
+        };
+    }
+
     if (type === 'icon') {
         return {
             id,

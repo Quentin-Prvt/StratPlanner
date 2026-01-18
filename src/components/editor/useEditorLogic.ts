@@ -5,12 +5,12 @@ import { supabase } from '../../supabaseClient';
 import { useCanvasZoom } from '../../hooks/useCanvasZoom';
 import { useSupabaseStrategies } from '../../hooks/useSupabase';
 import { useRealtimeStrategy } from '../../hooks/useRealtimeStrategy';
-import { checkAbilityHit, updateAbilityPosition } from '../../utils/canvasHitDetection';
+import { checkAbilityHit, updateAbilityPosition, checkVisionHit } from '../../utils/canvasHitDetection';
 import { drawSmoothLine, drawArrowHead } from '../../utils/canvasDrawing';
 import { renderDrawings } from '../../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../../utils/dropFactory';
 import { MAP_CONFIGS } from '../../utils/mapsRegistry';
-import type { DrawingObject, ToolType, StrokeType, StrategyStep } from '../../types/canvas';
+import type { DrawingObject, ToolType, StrokeType, StrategyStep, VisionObject } from '../../types/canvas';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUndoRedo } from '../../hooks/useUndoRedo';
 
@@ -373,6 +373,17 @@ export const useEditorLogic = (strategyId: string) => {
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
 
+                if (obj.tool === 'vision') {
+                    const vision = obj as VisionObject;
+                    const hit = checkVisionHit(pos, vision, mapScale);
+                    if (hit) {
+                        setDraggingObjectId(hit.id);
+                        setSpecialDragMode(hit.mode); // 'move' ou 'rotate'
+                        if (hit.offset) setDragOffset(hit.offset);
+                        return; // On a trouvé, on arrête
+                    }
+                }
+
                 // Text
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
@@ -477,6 +488,27 @@ export const useEditorLogic = (strategyId: string) => {
         if (draggingObjectId !== null) {
             const updatedList = drawingsRef.current.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
+
+                if (obj.tool === 'vision') {
+                    const vision = obj as VisionObject;
+
+                    if (specialDragMode === 'move') {
+                        // Déplacement classique
+                        const newX = pos.x - dragOffset.x;
+                        const newY = pos.y - dragOffset.y;
+                        broadcastMove(obj.id, newX, newY);
+                        return { ...vision, x: newX, y: newY };
+                    }
+
+                    if (specialDragMode === 'rotate') {
+                        // Rotation : on calcule l'angle entre le centre et la souris
+                        const dx = pos.x - vision.x;
+                        const dy = pos.y - vision.y;
+                        const newRotation = Math.atan2(dy, dx);
+
+                        return { ...vision, rotation: newRotation };
+                    }
+                }
 
                 let newX = obj.x;
                 let newY = obj.y;
@@ -695,6 +727,9 @@ export const useEditorLogic = (strategyId: string) => {
                 const h = (obj.height || iconSize) * mapScale;
                 if (finalX >= obj.x - w/2 - HIT_TOLERANCE && finalX <= obj.x + w/2 + HIT_TOLERANCE &&
                     finalY >= obj.y - h/2 - HIT_TOLERANCE && finalY <= obj.y + h/2 + HIT_TOLERANCE) hit = true;
+            }
+            else if (obj.tool === 'vision') {
+                if (Math.hypot((obj as VisionObject).x - finalX, (obj as VisionObject).y - finalY) < 20) hit = true;
             }
             else if (obj.tool === 'text' && obj.x != null) {
                 const fontSize = (obj.fontSize || 20) * mapScale;

@@ -1,4 +1,4 @@
-export type ToolType = 'pen' | 'eraser' | 'cursor' | 'image' | 'text' | string ;
+export type ToolType = 'pen' | 'eraser' | 'cursor' | 'image' | 'text' | 'vision' | string ;
 
 export type StrokeType =
     | 'solid' | 'dashed' | 'arrow' | 'dashed-arrow' | 'rect'
@@ -42,11 +42,20 @@ export interface DrawingObject {
     width?: number;
     height?: number;
     rotation?: number;
+    radius?: number;
 
     text?: string;
     fontSize?: number;
     fontWeight?: string;
     fontStyle?: string;
+}
+
+export interface VisionObject extends DrawingObject {
+    tool: 'vision';
+    x: number;
+    y: number;
+    rotation: number;
+    radius: number;
 }
 
 export interface StrategyStep {
@@ -67,3 +76,4 @@ export interface StrategyRecord {
     folder_id?: number | null;
     team_id?: string | null;
 }
+

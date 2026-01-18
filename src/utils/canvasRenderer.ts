@@ -1,4 +1,4 @@
-import type { DrawingObject } from '../types/canvas';
+import type { DrawingObject, VisionObject } from '../types/canvas';
 import { drawSmoothLine, drawArrowHead } from './canvasDrawing';
 import { getAgentColor, hexToRgba } from './agentColors';
 
@@ -35,6 +35,20 @@ import { drawWaylayUlt } from './abilities/waylayAbilities';
 import { drawHarborUlt} from "./abilities/harborUlt";
 import { drawViperUlt} from "./abilities/viperUlt";
 
+const drawDiamond = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size, y);
+    ctx.lineTo(x, y + size);
+    ctx.lineTo(x - size, y);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+};
+
 /**
  * Fonction principale qui dessine tout sur le canvas
  */
@@ -59,7 +73,62 @@ export const renderDrawings = (
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = obj.opacity;
 
-        // --- A. TEXTE (AVEC CONTRE-ROTATION) ---
+        if (obj.tool === 'vision') {
+            const vision = obj as VisionObject;
+
+            // On se place au centre de l'objet et on tourne
+            ctx.translate(vision.x, vision.y);
+            ctx.rotate(vision.rotation);
+
+            // 1. Le Cône (Remplissage)
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            // Arc de -30° à +30°
+            ctx.arc(0, 0, vision.radius * mapScale, -Math.PI / 15, Math.PI / 15);
+            ctx.closePath();
+            ctx.fillStyle = `${vision.color}40`; // Couleur avec transparence
+            ctx.fill();
+
+            // 2. Les contours (Lignes)
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.strokeStyle = vision.color;
+            ctx.lineWidth = vision.thickness;
+            ctx.stroke();
+
+            // Bords du cône
+            ctx.beginPath();
+            const r = vision.radius * mapScale;
+            // Bord haut
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(-Math.PI/15) * r, Math.sin(-Math.PI/15) * r);
+            // Bord bas
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(Math.PI/15) * r, Math.sin(Math.PI/15) * r);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore(); // On annule la rotation pour dessiner les poignées droites
+
+            const handleSize = 6;
+            ctx.beginPath();
+            ctx.arc(vision.x, vision.y, handleSize, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+
+            const handleX = vision.x + Math.cos(vision.rotation) * (vision.radius * mapScale);
+            const handleY = vision.y + Math.sin(vision.rotation) * (vision.radius * mapScale);
+
+            drawDiamond(ctx, handleX, handleY, handleSize, '#ff4655'); // Rouge Valorant
+
+            return;
+        }
+
+        // ---  TEXTE (AVEC CONTRE-ROTATION) ---
         if (obj.tool === 'text' && obj.text && obj.x !== undefined && obj.y !== undefined) {
             // On se déplace au point d'ancrage du texte
             ctx.translate(obj.x, obj.y);
