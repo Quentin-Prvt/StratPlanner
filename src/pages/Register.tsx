@@ -21,7 +21,6 @@ export const Register = () => {
                 email,
                 password,
                 options: {
-                    // C'est ici qu'on sauvegarde le pseudo
                     data: {
                         username: username,
                     }
