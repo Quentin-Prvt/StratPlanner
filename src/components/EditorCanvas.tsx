@@ -5,6 +5,7 @@ import { StepsBar } from './StepsBar';
 import { TextEditorModal } from './TextEditorModal';
 import { useEditorLogic } from './editor/useEditorLogic';
 import { Trash2 } from 'lucide-react';
+import { RemoteCursorOverlay } from './editor/RemoteCursorOverlay';
 interface EditorCanvasProps {
     strategyId: string;
 }
@@ -26,7 +27,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
         reverseMapError, setReverseMapError,
         reverseCallsError, setReverseCallsError,
-        isLoading, showLoadModal, setShowLoadModal, savedStrategies,
+        isLoading, showLoadModal, setShowLoadModal, savedStrategies,handleNavigateToStrategy, handleCreateInFolder,
         isTextModalOpen, setIsTextModalOpen,
         showDeleteModal, setShowDeleteModal,
         editingObj, setEditingTextId,
@@ -51,7 +52,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
         // Actions
         handleClearAll, handleClearAgents, handleClearAbilities, handleClearText, handleClearDrawings,
-        handleSaveText, handleLoadStrategy,
+        handleSaveText, handleLoadStrategy, remoteCursors,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
         handleFolderChange, handleDeleteRequest, confirmDelete, fetchStrategies
     } = editorLogic;
@@ -83,6 +84,10 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     onClearDrawings={handleClearDrawings}
                     isRotated={isRotated} setIsRotated={setIsRotated}
                     showMapCalls={showMapCalls} setShowMapCalls={setShowMapCalls}
+                    strategies={savedStrategies}
+                    currentStrategyId={strategyId}
+                    onNavigate={handleNavigateToStrategy}
+                    onCreateInFolder={handleCreateInFolder}
                 />
             </div>
 
@@ -97,6 +102,7 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                  onDoubleClick={handleDoubleClick}>
 
                 <div ref={contentRef} className="origin-top-left absolute  top-0 left-0">
+                    <RemoteCursorOverlay cursors={remoteCursors} isRotated={isRotated} />
                     <div ref={trashRef} className={`absolute top-4 right-4 z-50 p-3 rounded-xl border-2 transition-all duration-200 backdrop-blur-sm ${isOverTrash ? 'bg-red-500/30 border-red-500 scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-black/40 border-white/10 hover:bg-black/60 text-white/50 hover:text-white'}`} title="Glisser ici pour supprimer">
                         <Trash2 size={32} className={isOverTrash ? 'text-red-500 animate-bounce' : 'text-inherit'} />
                     </div>
