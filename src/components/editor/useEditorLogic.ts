@@ -809,32 +809,43 @@ export const useEditorLogic = (strategyId: string) => {
         } catch (err) { console.error("Drop error", err); }
     };
 
-    const handleSaveText = (data: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
-        const newId = generateId();
-        let currentList = [...drawingsRef.current];
+    const handleSaveText = (drawingData: DrawingObject) => {
+        // 1. Sauvegarder l'état actuel pour le Undo
         addToHistory(drawingsRef.current);
-        if (editingTextId !== null) {
-            currentList = currentList.map(obj => obj.id === editingTextId ? { ...obj, text: data.text, color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal', fontStyle: data.isItalic ? 'italic' : 'normal' } : obj);
-            setEditingTextId(null);
-        } else if (containerRef.current && imgRef.current) {
-            const containerRect = containerRef.current.getBoundingClientRect();
-            const { x, y, scale } = transformRef.current;
-            const centerX = containerRect.width / 2;
-            const centerY = containerRect.height / 2;
-            let mapX = (centerX - x) / scale;
-            let mapY = (centerY - y) / scale;
-            if (isRotated && imgRef.current) {
-                mapX = imgRef.current.clientWidth - mapX;
-                mapY = imgRef.current.clientHeight - mapY;
-            }
-            const newText: DrawingObject = {
-                id: newId, tool: 'text', text: data.text, points: [], x: mapX, y: mapY,
-                color: data.color, fontSize: data.fontSize, fontWeight: data.isBold ? 'bold' : 'normal',
-                fontStyle: data.isItalic ? 'italic' : 'normal', thickness: 0, opacity: 1
+
+        let currentList = [...drawingsRef.current];
+
+        // 2. Vérifier si l'objet existe déjà (Modification)
+        const existingIndex = currentList.findIndex(d => d.id === drawingData.id);
+
+        if (existingIndex !== -1) {
+            // Mise à jour : On remplace l'objet existant par le nouveau (qui contient le gras, souligné, etc.)
+            currentList[existingIndex] = {
+                ...currentList[existingIndex],
+                ...drawingData // On écrase avec les nouvelles données
             };
-            currentList.push(newText);
+
+            // Si on sortait du mode édition, on nettoie
+            setEditingTextId(null);
+        } else {
+            // Création : On ajoute le nouvel objet (s'il n'existe pas, on le centre par défaut si x/y manquent)
+            // Note : Normalement EditorCanvas envoie déjà x et y
+            const newTextObj: DrawingObject = {
+                ...drawingData,
+                // Sécurités au cas où
+                id: drawingData.id || generateId(),
+                tool: 'text',
+                points: [],
+                thickness: 0,
+                opacity: 1
+            };
+            currentList.push(newTextObj);
         }
+
+        // 3. Appliquer les changements
         drawingsRef.current = currentList;
+
+        // 4. Mettre à jour React et la Base de données
         setSteps(prevSteps => {
             const newSteps = [...prevSteps];
             if (newSteps[currentStepIndex]) {
@@ -844,8 +855,11 @@ export const useEditorLogic = (strategyId: string) => {
             immediateSave(newSteps);
             return newSteps;
         });
+
+        // 5. Fermer la modale et remettre l'outil curseur
         setIsTextModalOpen(false);
         setCurrentTool('cursor');
+        redrawMainCanvas();
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {

@@ -35,6 +35,7 @@ import { drawWaylayUlt } from './abilities/waylayAbilities';
 import { drawHarborUlt} from "./abilities/harborUlt";
 import { drawViperUlt} from "./abilities/viperUlt";
 
+// Fonction utilitaire pour dessiner le losange rouge (poignée de rotation)
 const drawDiamond = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => {
     ctx.beginPath();
     ctx.moveTo(x, y - size);
@@ -61,7 +62,7 @@ export const renderDrawings = (
     showZones: boolean = true,
     mapScale: number = 1.0,
     globalIconSize: number = 20,
-    isRotated: boolean = false // <--- AJOUT DU PARAMÈTRE ICI
+    isRotated: boolean = false
 ) => {
     // 1. Nettoyage du canvas
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -73,6 +74,7 @@ export const renderDrawings = (
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = obj.opacity;
 
+        // --- 1. OUTIL VISION (Cône) ---
         if (obj.tool === 'vision') {
             const vision = obj as VisionObject;
 
@@ -80,18 +82,19 @@ export const renderDrawings = (
             ctx.translate(vision.x, vision.y);
             ctx.rotate(vision.rotation);
 
-            // 1. Le Cône (Remplissage)
+            // Le Cône (Remplissage)
             ctx.beginPath();
             ctx.moveTo(0, 0);
-            // Arc de -30° à +30°
-            ctx.arc(0, 0, vision.radius * mapScale, -Math.PI / 15, Math.PI / 15);
+            // Arc de -30° à +30° (ajusté ici à PI/15 soit 12 degrés, modifiez selon besoin)
+            ctx.arc(0, 0, vision.radius * mapScale, -Math.PI / 6, Math.PI / 6);
             ctx.closePath();
             ctx.fillStyle = `${vision.color}40`; // Couleur avec transparence
             ctx.fill();
 
-            // 2. Les contours (Lignes)
+            // Les contours (Lignes)
             ctx.beginPath();
             ctx.moveTo(0, 0);
+            ctx.lineTo(vision.radius * mapScale, 0); // Ligne centrale
             ctx.strokeStyle = vision.color;
             ctx.lineWidth = vision.thickness;
             ctx.stroke();
@@ -101,15 +104,16 @@ export const renderDrawings = (
             const r = vision.radius * mapScale;
             // Bord haut
             ctx.moveTo(0, 0);
-            ctx.lineTo(Math.cos(-Math.PI/15) * r, Math.sin(-Math.PI/15) * r);
+            ctx.lineTo(Math.cos(-Math.PI/6) * r, Math.sin(-Math.PI/6) * r);
             // Bord bas
             ctx.moveTo(0, 0);
-            ctx.lineTo(Math.cos(Math.PI/15) * r, Math.sin(Math.PI/15) * r);
+            ctx.lineTo(Math.cos(Math.PI/6) * r, Math.sin(Math.PI/6) * r);
             ctx.lineWidth = 1;
             ctx.stroke();
 
             ctx.restore(); // On annule la rotation pour dessiner les poignées droites
 
+            // Poignée centrale (Déplacement)
             const handleSize = 6;
             ctx.beginPath();
             ctx.arc(vision.x, vision.y, handleSize, 0, Math.PI * 2);
@@ -119,26 +123,25 @@ export const renderDrawings = (
             ctx.lineWidth = 1;
             ctx.stroke();
 
-
+            // Poignée de rotation (Losange)
             const handleX = vision.x + Math.cos(vision.rotation) * (vision.radius * mapScale);
             const handleY = vision.y + Math.sin(vision.rotation) * (vision.radius * mapScale);
-
-            drawDiamond(ctx, handleX, handleY, handleSize, '#ff4655'); // Rouge Valorant
+            drawDiamond(ctx, handleX, handleY, handleSize, '#ff4655');
 
             return;
         }
 
-        // ---  TEXTE (AVEC CONTRE-ROTATION) ---
+        // --- 2. OUTIL TEXTE (Avec Styles Avancés) ---
         if (obj.tool === 'text' && obj.text && obj.x !== undefined && obj.y !== undefined) {
-            // On se déplace au point d'ancrage du texte
             ctx.translate(obj.x, obj.y);
-
-            // Si la map est retournée, on retourne le contexte de 180° pour que le texte reste lisible
+            // Contre-rotation si la map est tournée pour que le texte reste lisible
             if (isRotated) ctx.rotate(Math.PI);
 
             const fontSize = (obj.fontSize || 20) * mapScale;
             const fontWeight = obj.fontWeight || 'normal';
             const fontStyle = obj.fontStyle || 'normal';
+            const decoration = obj.textDecoration || 'none'; // 'underline' | 'none'
+            const bgColor = obj.backgroundColor || null; // string | null
 
             ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px Arial, sans-serif`;
             ctx.textAlign = 'center';
@@ -147,24 +150,62 @@ export const renderDrawings = (
             const lines = obj.text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
-            // Calcul du Y de départ centré (relatif à 0,0)
             const startY = -(totalHeight / 2) + (lineHeight / 2);
 
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 4;
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = 'black';
+            // --- GESTION DU FOND (HIGHLIGHT) ---
+            if (bgColor) {
+                let maxWidth = 0;
+                lines.forEach(line => {
+                    const metrics = ctx.measureText(line);
+                    if (metrics.width > maxWidth) maxWidth = metrics.width;
+                });
+
+                // Marge autour du texte
+                const padding = 6 * mapScale;
+                const bgWidth = maxWidth + (padding * 2);
+                const bgHeight = totalHeight + (padding * 2);
+
+                ctx.fillStyle = bgColor;
+                // Dessiner le rectangle centré
+                ctx.fillRect(-bgWidth / 2, -totalHeight / 2 - padding, bgWidth, bgHeight);
+            }
+            // -----------------------------------
 
             lines.forEach((line, index) => {
                 const lineY = startY + (index * lineHeight);
-                // On dessine en X=0 car on a déjà translate
+
+                // Contour noir pour lisibilité
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 4;
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'black';
                 ctx.strokeText(line, 0, lineY);
+
+                // Texte rempli
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = obj.color;
                 ctx.fillText(line, 0, lineY);
-                ctx.shadowBlur = 4;
+                ctx.shadowBlur = 4; // Remettre l'ombre pour la suite
+
+                // --- GESTION DU SOULIGNÉ ---
+                if (decoration === 'underline') {
+                    const metrics = ctx.measureText(line);
+                    const lineWidth = metrics.width;
+
+                    ctx.beginPath();
+                    // Ligne un peu en dessous du texte
+                    const underlineY = lineY + (fontSize * 0.4);
+                    ctx.moveTo(-lineWidth / 2, underlineY);
+                    ctx.lineTo(lineWidth / 2, underlineY);
+
+                    ctx.strokeStyle = obj.color;
+                    ctx.lineWidth = Math.max(1, fontSize * 0.08); // Épaisseur proportionnelle
+                    ctx.stroke();
+                }
+                // ---------------------------
             });
 
+            // Cadre de sélection
             if (draggingObjectId === obj.id) {
                 let maxWidth = 0;
                 lines.forEach(line => {
@@ -176,15 +217,13 @@ export const renderDrawings = (
                 ctx.strokeStyle = '#22c55e';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([5, 5]);
-                // Cadre centré sur 0,0
                 ctx.strokeRect(-width/2, -height/2, width, height);
             }
             ctx.restore();
             return;
         }
 
-        // --- B. ABILITIES VECTORIELLES ---
-        // (Les zones au sol tournent généralement avec la map, donc pas de changement ici)
+        // --- 3. ABILITIES VECTORIELLES ---
         if (obj.tool === 'stun_zone') { drawBreachStun(ctx, obj, mapScale); ctx.restore(); return; }
         if (obj.tool === 'breach_x_zone') { drawBreachUlt(ctx, obj, mapScale); ctx.restore(); return; }
         if (obj.tool === 'breach_c_zone') { drawBreachAftershock(ctx, obj, mapScale); ctx.restore(); return; }
@@ -221,7 +260,7 @@ export const renderDrawings = (
         if (obj.tool === 'vyse_x_zone') { drawVyseUltZone(ctx, obj, imageCache, triggerRedraw, showZones, mapScale); ctx.restore(); return; }
         if (obj.tool === 'waylay_x_zone') { drawWaylayUlt(ctx, obj, mapScale); ctx.restore(); return; }
 
-        // --- C. IMAGES CLASSIQUES (AGENTS) AVEC CONTRE-ROTATION ---
+        // --- 4. IMAGES CLASSIQUES (AGENTS) AVEC CONTRE-ROTATION ---
         if (obj.tool === 'image' && obj.imageSrc && obj.x != null && obj.y != null) {
             let img = imageCache.get(obj.imageSrc);
             if (!img) {
@@ -314,7 +353,7 @@ export const renderDrawings = (
             return;
         }
 
-        // --- D. DESSIN VECTORIEL (LIGNES, FLÈCHES) ---
+        // --- 5. DESSIN VECTORIEL (LIGNES, FLÈCHES) ---
         // Les lignes suivent généralement la géométrie de la map, donc on ne les contre-pivote pas.
 
         ctx.strokeStyle = obj.color;

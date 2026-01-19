@@ -42,12 +42,14 @@ export interface DrawingObject {
     width?: number;
     height?: number;
     rotation?: number;
-    radius?: number;
 
+    radius?: number;
     text?: string;
     fontSize?: number;
     fontWeight?: string;
     fontStyle?: string;
+    textDecoration?: 'underline' | 'none'; // Pour le souligné
+    backgroundColor?: string | null;
 }
 
 export interface VisionObject extends DrawingObject {
