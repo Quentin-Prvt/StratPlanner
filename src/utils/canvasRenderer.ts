@@ -86,7 +86,7 @@ export const renderDrawings = (
             ctx.beginPath();
             ctx.moveTo(0, 0);
             // Arc de -30° à +30° (ajusté ici à PI/15 soit 12 degrés, modifiez selon besoin)
-            ctx.arc(0, 0, vision.radius * mapScale, -Math.PI / 6, Math.PI / 6);
+            ctx.arc(0, 0, vision.radius * mapScale, -Math.PI / 15, Math.PI / 15);
             ctx.closePath();
             ctx.fillStyle = `${vision.color}40`; // Couleur avec transparence
             ctx.fill();
@@ -94,7 +94,7 @@ export const renderDrawings = (
             // Les contours (Lignes)
             ctx.beginPath();
             ctx.moveTo(0, 0);
-            ctx.lineTo(vision.radius * mapScale, 0); // Ligne centrale
+
             ctx.strokeStyle = vision.color;
             ctx.lineWidth = vision.thickness;
             ctx.stroke();
@@ -104,10 +104,10 @@ export const renderDrawings = (
             const r = vision.radius * mapScale;
             // Bord haut
             ctx.moveTo(0, 0);
-            ctx.lineTo(Math.cos(-Math.PI/6) * r, Math.sin(-Math.PI/6) * r);
+            ctx.lineTo(Math.cos(-Math.PI/15) * r, Math.sin(-Math.PI/15) * r);
             // Bord bas
             ctx.moveTo(0, 0);
-            ctx.lineTo(Math.cos(Math.PI/6) * r, Math.sin(Math.PI/6) * r);
+            ctx.lineTo(Math.cos(Math.PI/15) * r, Math.sin(Math.PI/15) * r);
             ctx.lineWidth = 1;
             ctx.stroke();
 
