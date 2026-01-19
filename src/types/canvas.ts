@@ -64,6 +64,7 @@ export interface StrategyStep {
     id: string;
     name: string;
     data: DrawingObject[];
+    notes?: StrategyNote[];
 }
 
 export interface StrategyRecord {
@@ -77,5 +78,18 @@ export interface StrategyRecord {
     user_id?: string;
     folder_id?: number | null;
     team_id?: string | null;
+}
+
+export interface StrategyNote {
+    id: string;
+    text: string;
+    color?: string;
+    fontSize?: number;
+    fontWeight?: string;
+    fontStyle?: string;
+    textDecoration?: 'underline' | 'none';
+    backgroundColor?: string | null;
+    // -------------------------------
+    createdAt?: number;
 }
 

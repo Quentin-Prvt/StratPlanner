@@ -10,7 +10,7 @@ import { drawSmoothLine, drawArrowHead } from '../../utils/canvasDrawing';
 import { renderDrawings } from '../../utils/canvasRenderer';
 import { createDrawingFromDrop } from '../../utils/dropFactory';
 import { MAP_CONFIGS } from '../../utils/mapsRegistry';
-import type { DrawingObject, ToolType, StrokeType, StrategyStep, VisionObject } from '../../types/canvas';
+import type { DrawingObject, ToolType, StrokeType, StrategyStep, VisionObject, StrategyNote } from '../../types/canvas';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUndoRedo } from '../../hooks/useUndoRedo';
 
@@ -67,7 +67,7 @@ export const useEditorLogic = (strategyId: string) => {
     const [showMapCalls, setShowMapCalls] = useState(true);
     const [reverseMapError, setReverseMapError] = useState(false);
     const [reverseCallsError, setReverseCallsError] = useState(false);
-    const [steps, setSteps] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [] }]);
+    const [steps, setSteps] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [], notes: [] }]);
     const [currentStepIndex, setCurrentStepIndexState] = useState(0);
     const [showZones, setShowZones] = useState(true);
     const [iconSize, setIconSize] = useState(30);
@@ -89,6 +89,7 @@ export const useEditorLogic = (strategyId: string) => {
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [specialDragMode, setSpecialDragMode] = useState<string | null>(null);
     const [wallCenterStart, setWallCenterStart] = useState({ x: 0, y: 0 });
+    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
     // --- AUTH ---
     const { user } = useAuth();
@@ -201,18 +202,13 @@ export const useEditorLogic = (strategyId: string) => {
         fetchFolders();
     }, []);
 
-    // --- FIX CHARGEMENT DONNÉES ---
     useEffect(() => {
         const loadInitialData = async () => {
             if (!strategyId) return;
             const data = await getStrategyById(strategyId);
             if (data) {
                 if (data.folder_id) setCurrentFolderId(data.folder_id.toString());
-
-                if (user) {
-                    fetchStrategies(data.team_id);
-                }
-
+                if (user) fetchStrategies(data.team_id);
                 if (data.map_name) {
                     const mapKey = data.map_name.toLowerCase();
                     const mapConfig = MAP_CONFIGS[mapKey];
@@ -220,17 +216,21 @@ export const useEditorLogic = (strategyId: string) => {
                 }
                 const rawData = data.data;
                 if (Array.isArray(rawData)) {
-                    setSteps([{ id: 'init', name: 'Setup', data: rawData }]);
+                    setSteps([{ id: 'init', name: 'Setup', data: rawData, notes: [] }]);
                     setCurrentStepIndex(0);
                 } else if (rawData && rawData.steps) {
-                    setSteps(rawData.steps);
+                    // On s'assure que notes existe
+                    const loadedSteps = rawData.steps.map((s: StrategyStep) => ({
+                        ...s,
+                        notes: s.notes || []
+                    }));
+                    setSteps(loadedSteps);
                     setCurrentStepIndex(rawData.currentStepIndex || 0);
                 }
             }
             setIsLoaded(true);
         };
         loadInitialData();
-
     }, [strategyId, fetchStrategies, user]);
 
     // --- REALTIME ---
@@ -263,13 +263,9 @@ export const useEditorLogic = (strategyId: string) => {
         const scaleY = canvas.height / rect.height;
         let x = (clientX - rect.left) * scaleX;
         let y = (clientY - rect.top) * scaleY;
-        if (isRotated) {
-            x = canvas.width - x;
-            y = canvas.height - y;
-        }
+        if (isRotated) { x = canvas.width - x; y = canvas.height - y; }
         return { x, y };
     };
-
     const getMousePos = (e: React.MouseEvent) => getAdjustedCoordinates(e.clientX, e.clientY);
     const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
 
@@ -708,6 +704,71 @@ export const useEditorLogic = (strategyId: string) => {
         return 'crosshair';
     };
 
+    const handleAddNote = () => {
+        setSteps(prevSteps => {
+            const newSteps = [...prevSteps];
+            const currentNotes = newSteps[currentStepIndex].notes || [];
+
+            newSteps[currentStepIndex] = {
+                ...newSteps[currentStepIndex],
+                notes: [
+                    ...currentNotes,
+                    {
+                        id: generateId().toString(),
+                        text: 'Nouvelle note',
+                        createdAt: Date.now(),
+                        // Styles par défaut
+                        color: '#ffffff',
+                        fontSize: 16,
+                        fontWeight: 'normal',
+                        fontStyle: 'normal',
+                        textDecoration: 'none',
+                        backgroundColor: null
+                    }
+                ]
+            };
+            immediateSave(newSteps);
+            return newSteps;
+        });
+    };
+
+    const handleUpdateNote = (noteId: string, updates: Partial<StrategyNote>) => {
+        setSteps(prevSteps => {
+            const newSteps = [...prevSteps];
+            const currentStep = newSteps[currentStepIndex];
+            if (!currentStep.notes) return prevSteps;
+
+            const noteIndex = currentStep.notes.findIndex(n => n.id === noteId);
+            if (noteIndex === -1) return prevSteps;
+
+            const updatedNotes = [...currentStep.notes];
+            // On fusionne les anciennes données avec les mises à jour
+            updatedNotes[noteIndex] = { ...updatedNotes[noteIndex], ...updates };
+
+            newSteps[currentStepIndex] = { ...currentStep, notes: updatedNotes };
+
+            debouncedSave(strategyId, newSteps, currentStepIndex);
+            return newSteps;
+        });
+        // On ferme la modale après sauvegarde
+        setIsTextModalOpen(false);
+        setEditingNoteId(null);
+    };
+    const handleDeleteNote = (noteId: string) => {
+        setSteps(prevSteps => {
+            const newSteps = [...prevSteps];
+            const currentStep = newSteps[currentStepIndex];
+            if (!currentStep.notes) return prevSteps;
+
+            newSteps[currentStepIndex] = {
+                ...currentStep,
+                notes: currentStep.notes.filter(n => n.id !== noteId)
+            };
+            immediateSave(newSteps);
+            return newSteps;
+        });
+    };
+
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
         const pos = getMousePos(e);
@@ -1003,6 +1064,9 @@ export const useEditorLogic = (strategyId: string) => {
         fetchStrategies,
         remoteCursors,
         handleNavigateToStrategy,
-        handleCreateInFolder
+        handleCreateInFolder,
+        editingNoteId, setEditingNoteId,
+        handleAddNote, handleUpdateNote, handleDeleteNote,
+        currentNotes: steps[currentStepIndex]?.notes || [],
     };
 };

@@ -6,6 +6,7 @@ import { TextEditorModal } from './TextEditorModal';
 import { useEditorLogic } from './editor/useEditorLogic';
 import { Trash2 } from 'lucide-react';
 import { RemoteCursorOverlay } from './editor/RemoteCursorOverlay';
+import { NotesSidebar } from './NotesSidebar';
 
 
 const generateId = () => Date.now() + Math.random();
@@ -57,10 +58,13 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
         handleClearAll, handleClearAgents, handleClearAbilities, handleClearText, handleClearDrawings,
         handleSaveText, handleLoadStrategy, remoteCursors,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
-        handleFolderChange, handleDeleteRequest, confirmDelete, fetchStrategies
+        handleFolderChange, handleDeleteRequest, confirmDelete, fetchStrategies,
+        editingNoteId, setEditingNoteId,
+        currentNotes, handleAddNote, handleUpdateNote, handleDeleteNote,
     } = editorLogic;
 
     const showReverseImage = isRotated && reverseMapSrc && !reverseMapError;
+    const editingNote = editingNoteId ? currentNotes.find(n => n.id === editingNoteId) : null;
 
     return (
         <div className="flex flex-col lg:flex-row h-full w-full bg-[#121212]">
@@ -172,43 +176,51 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
 
                 <TextEditorModal
                     isOpen={isTextModalOpen}
-                    onClose={() => { setIsTextModalOpen(false); setEditingTextId(null); setCurrentTool('cursor'); }}
-                    // CORRECTION ICI :
-                    onSave={(data) => {
-                        const newObject = {
-                            // Si on édite, on garde l'ID existant, sinon on génère
-                            ...(editingObj || {
-                                id: generateId(),
-                                tool: 'text' as const, // On force le type littéral 'text'
-                                x: 0,
-                                y: 0,
-                                points: [],
-                                thickness: 0,
-                                opacity: 1
-                            }),
-
-                            text: data.text,
-                            color: data.color,
-                            fontSize: data.fontSize,
-                            fontWeight: data.isBold ? 'bold' : 'normal',
-                            fontStyle: data.isItalic ? 'italic' : 'normal',
-
-                            // Nouveaux champs
-                            textDecoration: data.isUnderline ? 'underline' : 'none',
-                            backgroundColor: data.backgroundColor || undefined
-                        };
-
-                        // On utilise 'as any' si nécessaire pour satisfaire DrawingObject si les types ne sont pas encore parfaits
-                        handleSaveText(newObject as any);
+                    onClose={() => {
+                        setIsTextModalOpen(false);
+                        setEditingTextId(null);
+                        setEditingNoteId(null); // On reset aussi l'ID de la note
+                        setCurrentTool('cursor');
                     }}
 
-                    initialText={editingObj?.text || ''}
-                    initialColor={editingObj?.color || color}
-                    initialFontSize={editingObj?.fontSize || 24}
-                    initialBold={editingObj?.fontWeight === 'bold'}
-                    initialItalic={editingObj?.fontStyle === 'italic'}
-                    initialUnderline={editingObj?.textDecoration === 'underline'}
-                    initialBackgroundColor={editingObj?.backgroundColor || undefined}
+                    // C'EST ICI QUE CA SE JOUE :
+                    onSave={(data) => {
+                        // CAS 1 : On modifie une NOTE de la sidebar
+                        if (editingNoteId) {
+                            handleUpdateNote(editingNoteId, {
+                                text: data.text,
+                                color: data.color,
+                                fontSize: data.fontSize,
+                                fontWeight: data.isBold ? 'bold' : 'normal',
+                                fontStyle: data.isItalic ? 'italic' : 'normal',
+                                textDecoration: data.isUnderline ? 'underline' : 'none',
+                                backgroundColor: data.backgroundColor || undefined
+                            });
+                        }
+                        // CAS 2 : On modifie un TEXTE sur le canvas
+                        else {
+                            const newObject = {
+                                ...(editingObj || { id: generateId(), tool: 'text', x: 0, y: 0, points: [], thickness: 0, opacity: 1 }),
+                                text: data.text,
+                                color: data.color,
+                                fontSize: data.fontSize,
+                                fontWeight: data.isBold ? 'bold' : 'normal',
+                                fontStyle: data.isItalic ? 'italic' : 'normal',
+                                textDecoration: data.isUnderline ? 'underline' : 'none',
+                                backgroundColor: data.backgroundColor || undefined
+                            };
+                            handleSaveText(newObject as any);
+                        }
+                    }}
+
+                    // Remplissage des données initiales (Soit Note, Soit Texte Canvas, Soit Vide)
+                    initialText={editingNote?.text || editingObj?.text || ''}
+                    initialColor={editingNote?.color || editingObj?.color || '#ffffff'}
+                    initialFontSize={editingNote?.fontSize || editingObj?.fontSize || 24}
+                    initialBold={(editingNote?.fontWeight === 'bold') || (editingObj?.fontWeight === 'bold')}
+                    initialItalic={(editingNote?.fontStyle === 'italic') || (editingObj?.fontStyle === 'italic')}
+                    initialUnderline={(editingNote?.textDecoration === 'underline') || (editingObj?.textDecoration === 'underline')}
+                    initialBackgroundColor={editingNote?.backgroundColor || editingObj?.backgroundColor || undefined}
                 />
 
                 <ConfirmModal
@@ -219,6 +231,17 @@ export const EditorCanvas = ({ strategyId }: EditorCanvasProps) => {
                     message="Êtes-vous sûr de vouloir supprimer cette stratégie ? Cette action est irréversible."
                     isDangerous={true}
                     confirmText="Supprimer"
+                />
+            </div>
+            <div className="hidden lg:block h-full z-30">
+                <NotesSidebar
+                    notes={currentNotes}
+                    onAddNote={handleAddNote}
+                    onDeleteNote={handleDeleteNote}
+                    onEditNote={(note) => {
+                        setEditingNoteId(note.id);
+                        setIsTextModalOpen(true);
+                    }}
                 />
             </div>
         </div>
