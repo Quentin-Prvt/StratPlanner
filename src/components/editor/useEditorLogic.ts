@@ -149,7 +149,6 @@ export const useEditorLogic = (strategyId: string) => {
             ctx.imageSmoothingQuality = 'high';
             const mapScale = getCurrentScale();
             // On passe isRotated au renderer pour qu'il sache comment dessiner les objets (s'il gère leur rotation interne)
-            // @ts-expect-error - renderDrawings types
             renderDrawings(ctx, drawingsRef.current, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize, isRotated);
         });
     }, [draggingObjectId, showZones, currentMapSrc, iconSize, isRotated]);
@@ -628,7 +627,6 @@ export const useEditorLogic = (strategyId: string) => {
                     const newPenObject: DrawingObject = {
                         id: generateId(),
                         tool: strokeType === 'rect' ? 'rect' : 'pen',
-                        // @ts-expect-error - partial type
                         lineType: strokeType,
                         points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current],
                         color: color,
@@ -1006,7 +1004,6 @@ export const useEditorLogic = (strategyId: string) => {
     const handleFolderChange = async (newFolderId: string) => {
         setCurrentFolderId(newFolderId);
         if (strategyId) {
-            // @ts-expect-error - Typage partiel
             await supabase.from('strategies').update({ folder_id: newFolderId || null }).eq('id', strategyId);
         }
     };
@@ -1037,11 +1034,8 @@ export const useEditorLogic = (strategyId: string) => {
         drawings: drawingsRef.current,
         steps, currentStepIndex, setCurrentStepIndex,
         currentMapSrc,
-        // --- NOUVEAU RETOUR ICI ---
-        // On retourne la source active à utiliser dans le JSX
         activeMapSrc,
         activeCallsSrc,
-        // ---------------------------
         reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
         reverseMapError, setReverseMapError,
         reverseCallsError, setReverseCallsError,
