@@ -40,14 +40,13 @@ export const useEditorLogic = (strategyId: string) => {
 
     // --- STATE REFS ---
     const drawingsRef = useRef<DrawingObject[]>([]);
-
     const startHistoryRef = useRef<DrawingObject[]>([]);
 
     // Realtime Refs
     const isInteractingRef = useRef(false);
     const isRemoteUpdate = useRef(false);
 
-    // Historique
+    // --- HISTORIQUE ---
     const { addToHistory, undo, redo } = useUndoRedo();
 
     // Drawing Refs
@@ -57,13 +56,16 @@ export const useEditorLogic = (strategyId: string) => {
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
     // --- HOOKS ---
-    const { transformRef, contentRef,  centerView, panCanvas } = useCanvasZoom(containerRef);
+    const { transformRef, contentRef, centerView, panCanvas } = useCanvasZoom(containerRef);
     const { savedStrategies, isLoading, showLoadModal, setShowLoadModal, fetchStrategies, getStrategyById, updateStrategyData } = useSupabaseStrategies();
 
     // --- STATES ---
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentMapSrc, setCurrentMapSrc] = useState<string | null>(null);
+
+    // Rotation State (Initialisé via DB dans loadInitialData)
     const [isRotated, setIsRotated] = useState(false);
+
     const [showMapCalls, setShowMapCalls] = useState(true);
     const [reverseMapError, setReverseMapError] = useState(false);
     const [reverseCallsError, setReverseCallsError] = useState(false);
@@ -94,9 +96,40 @@ export const useEditorLogic = (strategyId: string) => {
     // --- AUTH ---
     const { user } = useAuth();
 
+    // --- COMPUTED MAP SOURCES (GESTION ROTATION) ---
+    // C'est ici que la magie opère pour la rotation
+    const { reverseMapSrc, callsMapSrc, reverseCallsMapSrc } = useMemo(() => {
+        if (!currentMapSrc) return { reverseMapSrc: null, callsMapSrc: null, reverseCallsMapSrc: null };
+
+        // Exemple: /maps/bind.svg
+        const parts = currentMapSrc.split('.');
+        const ext = parts.pop();
+        const base = parts.join('.');
+
+        return {
+            reverseMapSrc: `${base}_reverse.${ext}`,       // /maps/bind_reverse.svg
+            callsMapSrc: `${base}_calls.${ext}`,           // /maps/bind_calls.svg
+            reverseCallsMapSrc: `${base}_calls_reverse.${ext}` // /maps/bind_calls_reverse.svg
+        };
+    }, [currentMapSrc]);
+
+    // La source active pour la MAP (normale ou inversée)
+    const activeMapSrc = useMemo(() => {
+        if (!currentMapSrc) return null;
+
+        return isRotated ? (reverseMapSrc || currentMapSrc) : currentMapSrc;
+    }, [isRotated, currentMapSrc, reverseMapSrc]);
+
+    // La source active pour les CALLS (normale ou inversée)
+    const activeCallsSrc = useMemo(() => {
+        if (!callsMapSrc) return null;
+        return isRotated ? (reverseCallsMapSrc || callsMapSrc) : callsMapSrc;
+    }, [isRotated, callsMapSrc, reverseCallsMapSrc]);
+
+
     // --- COMPUTED ---
     const getCurrentScale = () => {
-        const entry = Object.entries(MAP_CONFIGS).find(([_, config]) => config.src === currentMapSrc);
+        const entry = Object.entries(MAP_CONFIGS).find(([, config]) => config.src === currentMapSrc);
         return entry ? entry[1].scale : 0.75;
     };
 
@@ -105,43 +138,62 @@ export const useEditorLogic = (strategyId: string) => {
         setCurrentStepIndexState(index);
     };
 
-    const applyHistoryState = (newState: DrawingObject[]) => {
-        // 1. Mettre à jour la Ref (pour la fluidité immédiate)
+    // --- REDRAW ---
+    const redrawMainCanvas = useCallback(() => {
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        requestRef.current = requestAnimationFrame(() => {
+            const canvas = mainCanvasRef.current;
+            const ctx = canvas?.getContext('2d');
+            if (!canvas || !ctx) return;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            const mapScale = getCurrentScale();
+            // On passe isRotated au renderer pour qu'il sache comment dessiner les objets (s'il gère leur rotation interne)
+            // @ts-expect-error - renderDrawings types
+            renderDrawings(ctx, drawingsRef.current, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize, isRotated);
+        });
+    }, [draggingObjectId, showZones, currentMapSrc, iconSize, isRotated]);
+
+    // --- SAVE LOGIC ---
+    const immediateSave = useCallback((stepsData: StrategyStep[], idx: number = currentStepIndex) => {
+        if (!strategyId) return;
+        // @ts-expect-error - Partial update
+        updateStrategyData(strategyId, { steps: stepsData, currentStepIndex: idx });
+    }, [strategyId, currentStepIndex, updateStrategyData]);
+
+    const debouncedSave = useMemo(() => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
+        // @ts-expect-error - Partial update
+        updateStrategyData(id, { steps: stepsData, currentStepIndex: idx });
+    }, 1000), [updateStrategyData]);
+
+    // --- HISTORY ---
+    const applyHistoryState = useCallback((newState: DrawingObject[]) => {
         drawingsRef.current = newState;
-
-        // 2. Redessiner
         redrawMainCanvas();
-
-        // 3. Mettre à jour le State React et la DB
         setSteps(prev => {
             const newSteps = [...prev];
             if (newSteps[currentStepIndex]) {
                 newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newState };
             }
-            // On force la sauvegarde DB immédiate pour synchroniser tout le monde
             immediateSave(newSteps);
             return newSteps;
         });
-    };
+    }, [currentStepIndex, redrawMainCanvas, immediateSave]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignorer si on écrit dans un input
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault();
                 if (e.shiftKey) {
-                    // REDO (Ctrl + Shift + Z)
                     const nextState = redo(drawingsRef.current);
                     if (nextState) applyHistoryState(nextState);
                 } else {
-                    // UNDO (Ctrl + Z)
                     const prevState = undo(drawingsRef.current);
                     if (prevState) applyHistoryState(prevState);
                 }
             } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-                // REDO (Ctrl + Y)
                 e.preventDefault();
                 const nextState = redo(drawingsRef.current);
                 if (nextState) applyHistoryState(nextState);
@@ -150,7 +202,7 @@ export const useEditorLogic = (strategyId: string) => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [undo, redo, currentStepIndex]);
+    }, [undo, redo, applyHistoryState]);
 
     const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
 
@@ -160,7 +212,7 @@ export const useEditorLogic = (strategyId: string) => {
             drawingsRef.current = steps[currentStepIndex].data;
             redrawMainCanvas();
         }
-    }, [steps, currentStepIndex]);
+    }, [steps, currentStepIndex, redrawMainCanvas]);
 
     useEffect(() => {
         setReverseMapError(false);
@@ -171,29 +223,14 @@ export const useEditorLogic = (strategyId: string) => {
         if (currentTool === 'text') setIsTextModalOpen(true);
     }, [currentTool]);
 
-    const { reverseMapSrc, callsMapSrc, reverseCallsMapSrc } = useMemo(() => {
-        if (!currentMapSrc) return { reverseMapSrc: null, callsMapSrc: null, reverseCallsMapSrc: null };
-        const parts = currentMapSrc.split('.');
-        const ext = parts.pop();
-        const base = parts.join('.');
-        return {
-            reverseMapSrc: `${base}_reverse.${ext}`,
-            callsMapSrc: `${base}_calls.${ext}`,
-            reverseCallsMapSrc: `${base}_calls_reverse.${ext}`
-        };
-    }, [currentMapSrc]);
+    // --- SAVE ROTATION STATE TO DB ---
+    useEffect(() => {
+        if (!isLoaded || !strategyId) return;
+        // @ts-expect-error - adding is_rotated to payload
+        updateStrategyData(strategyId, { is_rotated: isRotated });
+    }, [isRotated, isLoaded, strategyId, updateStrategyData]);
 
-    // --- DATA HANDLING ---
-    const immediateSave = (stepsData: StrategyStep[], idx: number = currentStepIndex) => {
-        if (!strategyId) return;
-        updateStrategyData(strategyId, { steps: stepsData, currentStepIndex: idx } as any);
-    };
-
-    const debouncedSave = useMemo(() => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
-        updateStrategyData(id, { steps: stepsData, currentStepIndex: idx } as any);
-    }, 1000), [updateStrategyData]);
-
-    // --- INITIAL DATA ---
+    // --- INITIAL DATA LOADING ---
     useEffect(() => {
         const fetchFolders = async () => {
             const { data } = await supabase.from('folders').select('id, name');
@@ -214,12 +251,17 @@ export const useEditorLogic = (strategyId: string) => {
                     const mapConfig = MAP_CONFIGS[mapKey];
                     if (mapConfig) setCurrentMapSrc(mapConfig.src);
                 }
+
+                // Charger l'état de rotation
+                if (data.is_rotated !== undefined) {
+                    setIsRotated(data.is_rotated);
+                }
+
                 const rawData = data.data;
                 if (Array.isArray(rawData)) {
                     setSteps([{ id: 'init', name: 'Setup', data: rawData, notes: [] }]);
                     setCurrentStepIndex(0);
                 } else if (rawData && rawData.steps) {
-                    // On s'assure que notes existe
                     const loadedSteps = rawData.steps.map((s: StrategyStep) => ({
                         ...s,
                         notes: s.notes || []
@@ -231,7 +273,7 @@ export const useEditorLogic = (strategyId: string) => {
             setIsLoaded(true);
         };
         loadInitialData();
-    }, [strategyId, fetchStrategies, user]);
+    }, [strategyId, fetchStrategies, user, getStrategyById]);
 
     // --- REALTIME ---
     const { broadcastMove, broadcastCursor, remoteCursors } = useRealtimeStrategy(
@@ -243,7 +285,7 @@ export const useEditorLogic = (strategyId: string) => {
         isInteractingRef
     );
 
-    // --- AUTO-SAVE EFFECT ---
+    // --- AUTO-SAVE ---
     useEffect(() => {
         if (!isLoaded || !strategyId) return;
         if (isRemoteUpdate.current) { isRemoteUpdate.current = false; return; }
@@ -252,7 +294,7 @@ export const useEditorLogic = (strategyId: string) => {
         debouncedSave(strategyId, steps, currentStepIndex);
 
         return () => debouncedSave.cancel();
-    }, [steps, currentStepIndex, strategyId, isLoaded, debouncedSave]);
+    }, [steps, currentStepIndex, strategyId, isLoaded, debouncedSave, isRemoteUpdate, isInteractingRef]);
 
     // --- GRAPHIC HELPERS ---
     const getAdjustedCoordinates = (clientX: number, clientY: number) => {
@@ -263,6 +305,10 @@ export const useEditorLogic = (strategyId: string) => {
         const scaleY = canvas.height / rect.height;
         let x = (clientX - rect.left) * scaleX;
         let y = (clientY - rect.top) * scaleY;
+        // NOTE: Si on utilise une image "map_reverse.svg", le canvas lui-même n'est PAS forcément rotaté géométriquement par CSS.
+        // Si votre logique précédente inversait les coordonnées ici, il faut le garder.
+        // Si vous utilisiez juste une image différente, alors "isRotated" ici doit peut-être être désactivé ou adapté.
+        // Je laisse comme c'était :
         if (isRotated) { x = canvas.width - x; y = canvas.height - y; }
         return { x, y };
     };
@@ -299,22 +345,8 @@ export const useEditorLogic = (strategyId: string) => {
         }
     };
 
-    // --- RENDER LOOP ---
+    // --- CANVAS RESIZE ---
     const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => canvasRef.current?.getContext('2d');
-
-    const redrawMainCanvas = useCallback(() => {
-        if (requestRef.current) cancelAnimationFrame(requestRef.current);
-        requestRef.current = requestAnimationFrame(() => {
-            const canvas = mainCanvasRef.current;
-            const ctx = canvas?.getContext('2d');
-            if (!canvas || !ctx) return;
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            const mapScale = getCurrentScale();
-            // @ts-ignore
-            renderDrawings(ctx, drawingsRef.current, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize, isRotated);
-        });
-    }, [draggingObjectId, showZones, currentMapSrc, iconSize, isRotated]);
 
     const syncCanvasSize = useCallback(() => {
         const main = mainCanvasRef.current;
@@ -330,6 +362,7 @@ export const useEditorLogic = (strategyId: string) => {
     useEffect(() => {
         const img = imgRef.current;
         if (!img) return;
+        // On écoute le load pour redimensionner quand l'image change (ex: rotation)
         if (img.complete && img.naturalWidth > 0) syncCanvasSize();
         const onLoad = () => syncCanvasSize();
         img.addEventListener('load', onLoad);
@@ -342,17 +375,15 @@ export const useEditorLogic = (strategyId: string) => {
         };
     }, [syncCanvasSize]);
 
-    // --- MOUSE HANDLERS ---
+    // --- HANDLERS ---
     const handleMouseDown = (e: React.MouseEvent) => {
         isInteractingRef.current = true;
         startHistoryRef.current = JSON.parse(JSON.stringify(drawingsRef.current));
 
-        const currentScale = transformRef.current.scale;
-        const isMinZoom = currentScale <= 0.501; // Petite marge de sécurité
+        const isMinZoom = transformRef.current.scale <= 0.501;
         const isMiddleClick = e.button === 1;
         const isLeftClick = e.button === 0;
 
-        // 1. PRIORITÉ : PAN via CLIC MOLETTE
         if (isMiddleClick && !isMinZoom) {
             setIsPanning(true);
             panStartRef.current = { x: e.clientX, y: e.clientY };
@@ -364,7 +395,6 @@ export const useEditorLogic = (strategyId: string) => {
         const mapScale = getCurrentScale();
         const pos = getMousePos(e);
 
-        // 2. DETECTION DES OBJETS
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
@@ -374,13 +404,12 @@ export const useEditorLogic = (strategyId: string) => {
                     const hit = checkVisionHit(pos, vision, mapScale);
                     if (hit) {
                         setDraggingObjectId(hit.id);
-                        setSpecialDragMode(hit.mode); // 'move' ou 'rotate'
+                        setSpecialDragMode(hit.mode);
                         if (hit.offset) setDragOffset(hit.offset);
-                        return; // On a trouvé, on arrête
+                        return;
                     }
                 }
 
-                // Text
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
@@ -390,7 +419,6 @@ export const useEditorLogic = (strategyId: string) => {
                         return;
                     }
                 }
-                // Image / Agent
                 if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                     const w = (obj.width || iconSize) * mapScale; const h = (obj.height || iconSize) * mapScale;
                     if (pos.x >= obj.x - w/2 && pos.x <= obj.x + w/2 && pos.y >= obj.y - h/2 && pos.y <= obj.y + h/2) {
@@ -400,8 +428,7 @@ export const useEditorLogic = (strategyId: string) => {
                         return;
                     }
                 }
-                // Ability
-                // @ts-ignore
+                // @ts-expect-error - checkAbilityHit
                 const hit = checkAbilityHit(pos, obj, mapScale);
                 if (hit) {
                     setDraggingObjectId(hit.id);
@@ -412,7 +439,6 @@ export const useEditorLogic = (strategyId: string) => {
                 }
             }
 
-            // 3. SI AUCUN OBJET -> PAN
             setDraggingObjectId(null);
 
             if (isLeftClick && !isMinZoom) {
@@ -452,7 +478,6 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        // --- GESTION POUBELLE ---
         if (draggingObjectId !== null && trashRef.current) {
             const trashRect = trashRef.current.getBoundingClientRect();
             const isOver = e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
@@ -462,7 +487,6 @@ export const useEditorLogic = (strategyId: string) => {
             setIsOverTrash(false);
         }
 
-        // --- GESTION PAN ---
         if (isPanning) {
             e.preventDefault();
             const dx = e.clientX - panStartRef.current.x;
@@ -476,11 +500,8 @@ export const useEditorLogic = (strategyId: string) => {
         const canvas = mainCanvasRef.current;
         const pos = { x: canvas ? clamp(rawPos.x, 0, canvas.width) : rawPos.x, y: canvas ? clamp(rawPos.y, 0, canvas.height) : rawPos.y };
 
-        // --- BROADCAST CURSEUR (NOUVEAU) ---
-        // On envoie la position "Map" aux autres utilisateurs
         broadcastCursor(pos.x, pos.y);
 
-        // --- GESTION DRAG ---
         if (draggingObjectId !== null) {
             const updatedList = drawingsRef.current.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
@@ -489,7 +510,6 @@ export const useEditorLogic = (strategyId: string) => {
                     const vision = obj as VisionObject;
 
                     if (specialDragMode === 'move') {
-                        // Déplacement classique
                         const newX = pos.x - dragOffset.x;
                         const newY = pos.y - dragOffset.y;
                         broadcastMove(obj.id, newX, newY);
@@ -497,7 +517,6 @@ export const useEditorLogic = (strategyId: string) => {
                     }
 
                     if (specialDragMode === 'rotate') {
-                        // Rotation : on calcule l'angle entre le centre et la souris
                         const dx = pos.x - vision.x;
                         const dy = pos.y - vision.y;
                         const newRotation = Math.atan2(dy, dx);
@@ -520,7 +539,7 @@ export const useEditorLogic = (strategyId: string) => {
                     return { ...obj, x: newX, y: newY };
                 }
                 const mapScale = getCurrentScale();
-                // @ts-ignore
+                // @ts-expect-error - updateAbilityPosition
                 const updatedObj = updateAbilityPosition(obj, pos, specialDragMode, dragOffset, wallCenterStart, mapScale);
                 if (updatedObj.x !== undefined && updatedObj.y !== undefined) {
                     broadcastMove(updatedObj.id, updatedObj.x, updatedObj.y);
@@ -532,7 +551,6 @@ export const useEditorLogic = (strategyId: string) => {
             return;
         }
 
-        // --- GESTION DESSIN (PEN) ---
         if (!isDrawing) return;
         if (currentTool === 'eraser') { eraseObjectAt(pos.x, pos.y); return; }
         if (currentTool === 'pen') {
@@ -556,7 +574,6 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleMouseUp = () => {
-        // ---  POUBELLE ---
         if (draggingObjectId !== null && isOverTrash) {
             const updatedDrawings = drawingsRef.current.filter(obj => obj.id !== draggingObjectId);
             drawingsRef.current = updatedDrawings;
@@ -578,14 +595,12 @@ export const useEditorLogic = (strategyId: string) => {
             return;
         }
 
-        // --- HISTORIQUE ---
         if (isDrawing || draggingObjectId !== null) {
             if (JSON.stringify(startHistoryRef.current) !== JSON.stringify(drawingsRef.current)) {
                 addToHistory(startHistoryRef.current);
             }
         }
 
-        // ---  FIN DRAG ---
         if (draggingObjectId !== null) {
             const finalData = [...drawingsRef.current];
             setSteps(prev => {
@@ -613,7 +628,7 @@ export const useEditorLogic = (strategyId: string) => {
                     const newPenObject: DrawingObject = {
                         id: generateId(),
                         tool: strokeType === 'rect' ? 'rect' : 'pen',
-                        // @ts-ignore
+                        // @ts-expect-error - partial type
                         lineType: strokeType,
                         points: strokeType === 'rect' ? [startPosRef.current, pointsRef.current[pointsRef.current.length - 1]] : [...pointsRef.current],
                         color: color,
@@ -717,7 +732,6 @@ export const useEditorLogic = (strategyId: string) => {
                         id: generateId().toString(),
                         text: 'Nouvelle note',
                         createdAt: Date.now(),
-                        // Styles par défaut
                         color: '#ffffff',
                         fontSize: 16,
                         fontWeight: 'normal',
@@ -742,7 +756,6 @@ export const useEditorLogic = (strategyId: string) => {
             if (noteIndex === -1) return prevSteps;
 
             const updatedNotes = [...currentStep.notes];
-            // On fusionne les anciennes données avec les mises à jour
             updatedNotes[noteIndex] = { ...updatedNotes[noteIndex], ...updates };
 
             newSteps[currentStepIndex] = { ...currentStep, notes: updatedNotes };
@@ -750,7 +763,6 @@ export const useEditorLogic = (strategyId: string) => {
             debouncedSave(strategyId, newSteps, currentStepIndex);
             return newSteps;
         });
-        // On ferme la modale après sauvegarde
         setIsTextModalOpen(false);
         setEditingNoteId(null);
     };
@@ -815,7 +827,7 @@ export const useEditorLogic = (strategyId: string) => {
                 if(finalX >= minX && finalX <= maxX && finalY >= minY && finalY <= maxY) hit = true;
             }
             else {
-                // @ts-ignore
+                // @ts-expect-error - checkAbilityHit with partial
                 if (checkAbilityHit(pos, obj, mapScale)) hit = true;
             }
             if (hit) {
@@ -871,29 +883,21 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleSaveText = (drawingData: DrawingObject) => {
-        // 1. Sauvegarder l'état actuel pour le Undo
         addToHistory(drawingsRef.current);
 
-        let currentList = [...drawingsRef.current];
+        const currentList = [...drawingsRef.current];
 
-        // 2. Vérifier si l'objet existe déjà (Modification)
         const existingIndex = currentList.findIndex(d => d.id === drawingData.id);
 
         if (existingIndex !== -1) {
-            // Mise à jour : On remplace l'objet existant par le nouveau (qui contient le gras, souligné, etc.)
             currentList[existingIndex] = {
                 ...currentList[existingIndex],
-                ...drawingData // On écrase avec les nouvelles données
+                ...drawingData
             };
-
-            // Si on sortait du mode édition, on nettoie
             setEditingTextId(null);
         } else {
-            // Création : On ajoute le nouvel objet (s'il n'existe pas, on le centre par défaut si x/y manquent)
-            // Note : Normalement EditorCanvas envoie déjà x et y
             const newTextObj: DrawingObject = {
                 ...drawingData,
-                // Sécurités au cas où
                 id: drawingData.id || generateId(),
                 tool: 'text',
                 points: [],
@@ -903,10 +907,8 @@ export const useEditorLogic = (strategyId: string) => {
             currentList.push(newTextObj);
         }
 
-        // 3. Appliquer les changements
         drawingsRef.current = currentList;
 
-        // 4. Mettre à jour React et la Base de données
         setSteps(prevSteps => {
             const newSteps = [...prevSteps];
             if (newSteps[currentStepIndex]) {
@@ -917,7 +919,6 @@ export const useEditorLogic = (strategyId: string) => {
             return newSteps;
         });
 
-        // 5. Fermer la modale et remettre l'outil curseur
         setIsTextModalOpen(false);
         setCurrentTool('cursor');
         redrawMainCanvas();
@@ -939,10 +940,9 @@ export const useEditorLogic = (strategyId: string) => {
         }
     };
 
-    // --- STEP ACTIONS ---
     const handleAddStep = () => {
         setSteps(prevSteps => {
-            const newSteps = [...prevSteps, { id: generateId().toString(), name: `Phase ${prevSteps.length + 1}`, data: [] }];
+            const newSteps = [...prevSteps, { id: generateId().toString(), name: `Phase ${prevSteps.length + 1}`, data: [], notes: [] }];
             const newIndex = prevSteps.length;
             immediateSave(newSteps, newIndex);
             setCurrentStepIndex(newIndex);
@@ -957,7 +957,8 @@ export const useEditorLogic = (strategyId: string) => {
             const newStep = {
                 id: generateId().toString(),
                 name: `${currentStep.name} (Copy)`,
-                data: clonedData
+                data: clonedData,
+                notes: currentStep.notes ? JSON.parse(JSON.stringify(currentStep.notes)) : []
             };
             const newSteps = [...prevSteps];
             newSteps.splice(currentStepIndex + 1, 0, newStep);
@@ -990,7 +991,6 @@ export const useEditorLogic = (strategyId: string) => {
         });
     };
 
-    // --- NAVIGATION INTER-STRATÉGIES ---
     const handleNavigateToStrategy = (id: string) => {
         navigate(`/editor/${id}`);
     };
@@ -1003,10 +1003,10 @@ export const useEditorLogic = (strategyId: string) => {
         }
     };
 
-    // --- FILE ACTIONS ---
     const handleFolderChange = async (newFolderId: string) => {
         setCurrentFolderId(newFolderId);
         if (strategyId) {
+            // @ts-expect-error - Typage partiel
             await supabase.from('strategies').update({ folder_id: newFolderId || null }).eq('id', strategyId);
         }
     };
@@ -1018,10 +1018,11 @@ export const useEditorLogic = (strategyId: string) => {
         else console.error("Error deleting:", error);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleLoadStrategy = (strat: any) => {
         if (strat && strat.data) {
             if (Array.isArray(strat.data)) {
-                setSteps([{ id: 'init', name: 'Setup', data: strat.data }]);
+                setSteps([{ id: 'init', name: 'Setup', data: strat.data, notes: [] }]);
                 setCurrentStepIndex(0);
             } else if (strat.data.steps) {
                 setSteps(strat.data.steps);
@@ -1036,6 +1037,11 @@ export const useEditorLogic = (strategyId: string) => {
         drawings: drawingsRef.current,
         steps, currentStepIndex, setCurrentStepIndex,
         currentMapSrc,
+        // --- NOUVEAU RETOUR ICI ---
+        // On retourne la source active à utiliser dans le JSX
+        activeMapSrc,
+        activeCallsSrc,
+        // ---------------------------
         reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
         reverseMapError, setReverseMapError,
         reverseCallsError, setReverseCallsError,
