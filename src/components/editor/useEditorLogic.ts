@@ -36,7 +36,18 @@ export const useEditorLogic = (strategyId: string) => {
     const imgRef = useRef<HTMLImageElement>(null);
     const trashRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<number | null>(null);
+
+    // Data Refs
     const currentStepIndexRef = useRef(0);
+    const stepsRef = useRef<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [], notes: [] }]);
+
+    // Technical Refs
+    const interactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const clickPosRef = useRef<{x: number, y: number} | null>(null);
+    const lastSavedDataRef = useRef<string>("");
+
+    // LE VERROU MAGIQUE : Empêche le ping-pong lors du changement de step
+    const isSwitchingStepRef = useRef(false);
 
     // --- STATE REFS ---
     const drawingsRef = useRef<DrawingObject[]>([]);
@@ -62,15 +73,16 @@ export const useEditorLogic = (strategyId: string) => {
     // --- STATES ---
     const [isLoaded, setIsLoaded] = useState(false);
     const [currentMapSrc, setCurrentMapSrc] = useState<string | null>(null);
-
-    // Rotation State (Initialisé via DB dans loadInitialData)
     const [isRotated, setIsRotated] = useState(false);
 
     const [showMapCalls, setShowMapCalls] = useState(true);
     const [reverseMapError, setReverseMapError] = useState(false);
     const [reverseCallsError, setReverseCallsError] = useState(false);
-    const [steps, setSteps] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [], notes: [] }]);
+
+    // UI States
+    const [steps, setStepsState] = useState<StrategyStep[]>([{ id: 'init', name: 'Setup', data: [], notes: [] }]);
     const [currentStepIndex, setCurrentStepIndexState] = useState(0);
+
     const [showZones, setShowZones] = useState(true);
     const [iconSize, setIconSize] = useState(30);
     const [folders, setFolders] = useState<{id: string, name: string}[]>([]);
@@ -78,12 +90,18 @@ export const useEditorLogic = (strategyId: string) => {
     const [isTextModalOpen, setIsTextModalOpen] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingTextId, setEditingTextId] = useState<number | null>(null);
+
+    // Tools
     const [currentTool, setCurrentTool] = useState<ToolType | 'tools' | 'settings' | 'text' | null>('cursor');
     const [strokeType, setStrokeType] = useState<StrokeType>('solid');
     const [color, setColor] = useState('#ef4444');
     const [opacity, setOpacity] = useState(1);
     const [thickness, setThickness] = useState(4);
+
+    // Selection
     const [selectedAgent, setSelectedAgent] = useState('jett');
+    const [selectedAbility, setSelectedAbility] = useState<string | null>(null);
+
     const [isDrawing, setIsDrawing] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
     const [draggingObjectId, setDraggingObjectId] = useState<number | null>(null);
@@ -93,39 +111,8 @@ export const useEditorLogic = (strategyId: string) => {
     const [wallCenterStart, setWallCenterStart] = useState({ x: 0, y: 0 });
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
-    // --- AUTH ---
     const { user } = useAuth();
-
-    // --- COMPUTED MAP SOURCES (GESTION ROTATION) ---
-    // C'est ici que la magie opère pour la rotation
-    const { reverseMapSrc, callsMapSrc, reverseCallsMapSrc } = useMemo(() => {
-        if (!currentMapSrc) return { reverseMapSrc: null, callsMapSrc: null, reverseCallsMapSrc: null };
-
-        // Exemple: /maps/bind.svg
-        const parts = currentMapSrc.split('.');
-        const ext = parts.pop();
-        const base = parts.join('.');
-
-        return {
-            reverseMapSrc: `${base}_reverse.${ext}`,       // /maps/bind_reverse.svg
-            callsMapSrc: `${base}_calls.${ext}`,           // /maps/bind_calls.svg
-            reverseCallsMapSrc: `${base}_calls_reverse.${ext}` // /maps/bind_calls_reverse.svg
-        };
-    }, [currentMapSrc]);
-
-    // La source active pour la MAP (normale ou inversée)
-    const activeMapSrc = useMemo(() => {
-        if (!currentMapSrc) return null;
-
-        return isRotated ? (reverseMapSrc || currentMapSrc) : currentMapSrc;
-    }, [isRotated, currentMapSrc, reverseMapSrc]);
-
-    // La source active pour les CALLS (normale ou inversée)
-    const activeCallsSrc = useMemo(() => {
-        if (!callsMapSrc) return null;
-        return isRotated ? (reverseCallsMapSrc || callsMapSrc) : callsMapSrc;
-    }, [isRotated, callsMapSrc, reverseCallsMapSrc]);
-
+    const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
 
     // --- COMPUTED ---
     const getCurrentScale = () => {
@@ -133,9 +120,72 @@ export const useEditorLogic = (strategyId: string) => {
         return entry ? entry[1].scale : 0.75;
     };
 
+    // --- SAVE LOGIC ---
+    const debouncedSaveData = useMemo(
+        () => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
+            updateStrategyData(id, { data: { steps: stepsData, currentStepIndex: idx } });
+        }, 2000),
+        [updateStrategyData]
+    );
+
+    const immediateSave = useCallback((stepsData: StrategyStep[], idx: number = currentStepIndex) => {
+        if (!strategyId) return;
+        updateStrategyData(strategyId, { data: { steps: stepsData, currentStepIndex: idx } });
+    }, [strategyId, currentStepIndex, updateStrategyData]);
+
+    // --- SMART STATE UPDATER ---
+    const updateStepsIfChanged = useCallback((newStepsOrUpdater: StrategyStep[] | ((prev: StrategyStep[]) => StrategyStep[])) => {
+        // PROTECTION VERROU: Si on change de step manuellement, on ignore les updates externes
+        if (isSwitchingStepRef.current) return;
+
+        setStepsState(prev => {
+            const newSteps = typeof newStepsOrUpdater === 'function' ? newStepsOrUpdater(prev) : newStepsOrUpdater;
+            const prevJson = JSON.stringify(prev);
+            const newJson = JSON.stringify(newSteps);
+
+            if (prevJson === newJson) return prev;
+
+            stepsRef.current = newSteps;
+            return newSteps;
+        });
+    }, []);
+
+    // --- CHANGEMENT DE STEP (CORRIGÉ) ---
     const setCurrentStepIndex = (index: number) => {
+        if (index === currentStepIndexRef.current) return;
+
+        console.log('[STEP] Manual switch to:', index);
+
+        // 1. ACTIVATION DU VERROU
+        isSwitchingStepRef.current = true;
+
+        // 2. Annulation des sauvegardes en attente
+        debouncedSaveData.cancel();
+
+        // 3. Mise à jour Locale
         currentStepIndexRef.current = index;
         setCurrentStepIndexState(index);
+
+        // 4. Chargement des dessins
+        if (stepsRef.current[index]) {
+            drawingsRef.current = stepsRef.current[index].data;
+            redrawMainCanvas();
+        }
+
+        // 5. Sauvegarde Immédiate du nouvel index
+        if (strategyId) {
+            updateStrategyData(strategyId, { data: { steps: stepsRef.current, currentStepIndex: index } });
+
+            // CORRECTION: On utilise la variable pour mettre à jour la Ref
+            const newDataState = JSON.stringify(stepsRef.current);
+            lastSavedDataRef.current = newDataState; // <-- C'ETAIT ICI LE PROBLEME
+        }
+
+        // 6. DÉSACTIVATION DU VERROU APRES DÉLAI
+        setTimeout(() => {
+            isSwitchingStepRef.current = false;
+            console.log('[STEP] Unlocked.');
+        }, 1000);
     };
 
     // --- REDRAW ---
@@ -148,41 +198,34 @@ export const useEditorLogic = (strategyId: string) => {
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             const mapScale = getCurrentScale();
-            // On passe isRotated au renderer pour qu'il sache comment dessiner les objets (s'il gère leur rotation interne)
             renderDrawings(ctx, drawingsRef.current, imageCache.current, redrawMainCanvas, draggingObjectId, showZones, mapScale, iconSize, isRotated);
         });
     }, [draggingObjectId, showZones, currentMapSrc, iconSize, isRotated]);
 
-    // --- SAVE LOGIC ---
-    const immediateSave = useCallback((stepsData: StrategyStep[], idx: number = currentStepIndex) => {
-        if (!strategyId) return;
-        // @ts-expect-error - Partial update
-        updateStrategyData(strategyId, { steps: stepsData, currentStepIndex: idx });
-    }, [strategyId, currentStepIndex, updateStrategyData]);
+    // --- ROTATION HANDLER ---
+    const handleToggleRotation = (newValue: boolean) => {
+        setIsRotated(newValue);
+    };
 
-    const debouncedSave = useMemo(() => debounce((id: string, stepsData: StrategyStep[], idx: number) => {
-        // @ts-expect-error - Partial update
-        updateStrategyData(id, { steps: stepsData, currentStepIndex: idx });
-    }, 1000), [updateStrategyData]);
-
-    // --- HISTORY ---
     const applyHistoryState = useCallback((newState: DrawingObject[]) => {
         drawingsRef.current = newState;
         redrawMainCanvas();
-        setSteps(prev => {
-            const newSteps = [...prev];
-            if (newSteps[currentStepIndex]) {
-                newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newState };
-            }
-            immediateSave(newSteps);
-            return newSteps;
-        });
-    }, [currentStepIndex, redrawMainCanvas, immediateSave]);
 
+        const newSteps = [...stepsRef.current];
+        if (newSteps[currentStepIndexRef.current]) {
+            newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: newState };
+        }
+
+        updateStepsIfChanged(newSteps);
+        lastSavedDataRef.current = JSON.stringify(newSteps);
+        debouncedSaveData.cancel();
+        immediateSave(newSteps, currentStepIndexRef.current);
+    }, [redrawMainCanvas, immediateSave, debouncedSaveData, updateStepsIfChanged]);
+
+    // --- EFFECTS ---
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -198,38 +241,70 @@ export const useEditorLogic = (strategyId: string) => {
                 if (nextState) applyHistoryState(nextState);
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [undo, redo, applyHistoryState]);
 
-    const editingObj = editingTextId ? drawingsRef.current.find(d => d.id === editingTextId) : null;
-
-    // --- EFFECTS ---
     useEffect(() => {
-        if (steps[currentStepIndex]) {
-            drawingsRef.current = steps[currentStepIndex].data;
-            redrawMainCanvas();
+        if (!isSwitchingStepRef.current && steps[currentStepIndex]) {
+            if (draggingObjectId === null) {
+                drawingsRef.current = steps[currentStepIndex].data;
+                redrawMainCanvas();
+            }
         }
-    }, [steps, currentStepIndex, redrawMainCanvas]);
+    }, [steps, currentStepIndex, redrawMainCanvas, draggingObjectId]);
 
     useEffect(() => {
         setReverseMapError(false);
         setReverseCallsError(false);
     }, [currentMapSrc]);
 
-    useEffect(() => {
-        if (currentTool === 'text') setIsTextModalOpen(true);
-    }, [currentTool]);
-
-    // --- SAVE ROTATION STATE TO DB ---
+    // --- AUTO-SAVE TRIGGER ---
     useEffect(() => {
         if (!isLoaded || !strategyId) return;
-        // @ts-expect-error - adding is_rotated to payload
-        updateStrategyData(strategyId, { is_rotated: isRotated });
-    }, [isRotated, isLoaded, strategyId, updateStrategyData]);
 
-    // --- INITIAL DATA LOADING ---
+        // Bloquer l'auto-save si on est en transition manuelle
+        if (isSwitchingStepRef.current) return;
+
+        if (isRemoteUpdate.current) {
+            lastSavedDataRef.current = JSON.stringify(steps);
+            isRemoteUpdate.current = false;
+            return;
+        }
+        if (isInteractingRef.current) return;
+
+        const currentDataString = JSON.stringify(steps);
+        if (currentDataString === lastSavedDataRef.current) return;
+
+        lastSavedDataRef.current = currentDataString;
+        debouncedSaveData(strategyId, steps, currentStepIndex);
+
+        return () => debouncedSaveData.cancel();
+    }, [steps, currentStepIndex, strategyId, isLoaded, debouncedSaveData, isRemoteUpdate, isInteractingRef]);
+
+    const { reverseMapSrc, callsMapSrc, reverseCallsMapSrc } = useMemo(() => {
+        if (!currentMapSrc) return { reverseMapSrc: null, callsMapSrc: null, reverseCallsMapSrc: null };
+        const parts = currentMapSrc.split('.');
+        const ext = parts.pop();
+        const base = parts.join('.');
+        return {
+            reverseMapSrc: `${base}_reverse.${ext}`,
+            callsMapSrc: `${base}_calls.${ext}`,
+            reverseCallsMapSrc: `${base}_calls_reverse.${ext}`
+        };
+    }, [currentMapSrc]);
+
+    const activeMapSrc = useMemo(() => {
+        if (!currentMapSrc) return null;
+        return isRotated ? (reverseMapSrc || currentMapSrc) : currentMapSrc;
+    }, [isRotated, currentMapSrc, reverseMapSrc]);
+
+    const activeCallsSrc = useMemo(() => {
+        if (!callsMapSrc) return null;
+        return isRotated ? (reverseCallsMapSrc || callsMapSrc) : callsMapSrc;
+    }, [isRotated, callsMapSrc, reverseCallsMapSrc]);
+
+    // Load Data
     useEffect(() => {
         const fetchFolders = async () => {
             const { data } = await supabase.from('folders').select('id, name');
@@ -251,49 +326,33 @@ export const useEditorLogic = (strategyId: string) => {
                     if (mapConfig) setCurrentMapSrc(mapConfig.src);
                 }
 
-                // Charger l'état de rotation
-                if (data.is_rotated !== undefined) {
-                    setIsRotated(data.is_rotated);
-                }
-
                 const rawData = data.data;
                 if (Array.isArray(rawData)) {
-                    setSteps([{ id: 'init', name: 'Setup', data: rawData, notes: [] }]);
-                    setCurrentStepIndex(0);
+                    const init = [{ id: 'init', name: 'Setup', data: rawData, notes: [] }];
+                    updateStepsIfChanged(init);
+                    setCurrentStepIndexState(0);
+                    currentStepIndexRef.current = 0;
+                    lastSavedDataRef.current = JSON.stringify(init);
                 } else if (rawData && rawData.steps) {
-                    const loadedSteps = rawData.steps.map((s: StrategyStep) => ({
-                        ...s,
-                        notes: s.notes || []
-                    }));
-                    setSteps(loadedSteps);
-                    setCurrentStepIndex(rawData.currentStepIndex || 0);
+                    updateStepsIfChanged(rawData.steps);
+                    setCurrentStepIndexState(rawData.currentStepIndex || 0);
+                    currentStepIndexRef.current = rawData.currentStepIndex || 0;
+                    lastSavedDataRef.current = JSON.stringify(rawData.steps);
                 }
             }
             setIsLoaded(true);
         };
         loadInitialData();
-    }, [strategyId, fetchStrategies, user, getStrategyById]);
+    }, [strategyId, fetchStrategies, user, getStrategyById, updateStepsIfChanged]);
 
-    // --- REALTIME ---
     const { broadcastMove, broadcastCursor, remoteCursors } = useRealtimeStrategy(
         strategyId,
         user,
-        setSteps,
+        updateStepsIfChanged,
         currentStepIndexRef,
         isRemoteUpdate,
         isInteractingRef
     );
-
-    // --- AUTO-SAVE ---
-    useEffect(() => {
-        if (!isLoaded || !strategyId) return;
-        if (isRemoteUpdate.current) { isRemoteUpdate.current = false; return; }
-        if (isInteractingRef.current) return;
-
-        debouncedSave(strategyId, steps, currentStepIndex);
-
-        return () => debouncedSave.cancel();
-    }, [steps, currentStepIndex, strategyId, isLoaded, debouncedSave, isRemoteUpdate, isInteractingRef]);
 
     // --- GRAPHIC HELPERS ---
     const getAdjustedCoordinates = (clientX: number, clientY: number) => {
@@ -304,10 +363,6 @@ export const useEditorLogic = (strategyId: string) => {
         const scaleY = canvas.height / rect.height;
         let x = (clientX - rect.left) * scaleX;
         let y = (clientY - rect.top) * scaleY;
-        // NOTE: Si on utilise une image "map_reverse.svg", le canvas lui-même n'est PAS forcément rotaté géométriquement par CSS.
-        // Si votre logique précédente inversait les coordonnées ici, il faut le garder.
-        // Si vous utilisiez juste une image différente, alors "isRotated" ici doit peut-être être désactivé ou adapté.
-        // Je laisse comme c'était :
         if (isRotated) { x = canvas.width - x; y = canvas.height - y; }
         return { x, y };
     };
@@ -331,20 +386,16 @@ export const useEditorLogic = (strategyId: string) => {
 
         if (newDrawings.length !== drawingsRef.current.length) {
             drawingsRef.current = newDrawings;
-            setSteps(prev => {
-                const newSteps = [...prev];
-                if (newSteps[currentStepIndex]) {
-                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newDrawings };
-                }
-                debouncedSave.cancel();
-                immediateSave(newSteps);
-                return newSteps;
-            });
+            // UPDATE STEPS
+            const newSteps = [...stepsRef.current];
+            if (newSteps[currentStepIndexRef.current]) {
+                newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: newDrawings };
+            }
+            updateStepsIfChanged(newSteps);
             redrawMainCanvas();
         }
     };
 
-    // --- CANVAS RESIZE ---
     const getContext = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => canvasRef.current?.getContext('2d');
 
     const syncCanvasSize = useCallback(() => {
@@ -361,7 +412,6 @@ export const useEditorLogic = (strategyId: string) => {
     useEffect(() => {
         const img = imgRef.current;
         if (!img) return;
-        // On écoute le load pour redimensionner quand l'image change (ex: rotation)
         if (img.complete && img.naturalWidth > 0) syncCanvasSize();
         const onLoad = () => syncCanvasSize();
         img.addEventListener('load', onLoad);
@@ -376,6 +426,11 @@ export const useEditorLogic = (strategyId: string) => {
 
     // --- HANDLERS ---
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (interactionTimeoutRef.current) {
+            clearTimeout(interactionTimeoutRef.current);
+            interactionTimeoutRef.current = null;
+        }
+
         isInteractingRef.current = true;
         startHistoryRef.current = JSON.parse(JSON.stringify(drawingsRef.current));
 
@@ -397,7 +452,6 @@ export const useEditorLogic = (strategyId: string) => {
         if (currentTool === 'cursor'|| currentTool === 'settings' || currentTool === 'tools') {
             for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
                 const obj = drawingsRef.current[i];
-
                 if (obj.tool === 'vision') {
                     const vision = obj as VisionObject;
                     const hit = checkVisionHit(pos, vision, mapScale);
@@ -408,7 +462,6 @@ export const useEditorLogic = (strategyId: string) => {
                         return;
                     }
                 }
-
                 if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
                     const fontSize = obj.fontSize || 20;
                     const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
@@ -437,9 +490,7 @@ export const useEditorLogic = (strategyId: string) => {
                     return;
                 }
             }
-
             setDraggingObjectId(null);
-
             if (isLeftClick && !isMinZoom) {
                 setIsPanning(true);
                 panStartRef.current = { x: e.clientX, y: e.clientY };
@@ -449,22 +500,44 @@ export const useEditorLogic = (strategyId: string) => {
             return;
         }
 
-        if (currentTool === 'agent') {
-            const newObj: DrawingObject = { id: generateId(), tool: 'image', subtype: 'agent', points: [], color: '#fff', thickness: 0, opacity: 1, imageSrc: selectedAgent, x: pos.x, y: pos.y, width: iconSize, height: iconSize };
-            drawingsRef.current = [...drawingsRef.current, newObj];
-            redrawMainCanvas();
-            setSteps(prev => {
-                const newSteps = [...prev];
-                if (newSteps[currentStepIndex]) {
-                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: drawingsRef.current };
-                }
-                debouncedSave.cancel();
-                immediateSave(newSteps);
-                return newSteps;
-            });
+        // --- TEXT HANDLER ---
+        if (currentTool === 'text') {
+            clickPosRef.current = pos;
+            setEditingTextId(null);
+            setIsTextModalOpen(true);
             return;
         }
+
+        // --- GENERIC ADD HANDLER ---
+        if (currentTool !== 'eraser' && currentTool !== 'pen') {
+            // CORRECTION ICI: Cast explicite pour éviter l'erreur TS2345
+            const type = currentTool as ToolType;
+
+            let name: string = selectedAgent;
+            if (currentTool === 'ability') name = selectedAbility || selectedAgent || 'c';
+
+            const newObj = createDrawingFromDrop(type, name, pos.x, pos.y);
+
+            if (newObj) {
+                newObj.id = generateId();
+                drawingsRef.current = [...drawingsRef.current, newObj];
+                redrawMainCanvas();
+
+                // UPDATE STEPS VIA REF
+                const newSteps = [...stepsRef.current];
+                if (newSteps[currentStepIndexRef.current]) {
+                    newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: drawingsRef.current };
+                }
+                updateStepsIfChanged(newSteps);
+                lastSavedDataRef.current = JSON.stringify(newSteps);
+                debouncedSaveData.cancel();
+                immediateSave(newSteps, currentStepIndexRef.current);
+            }
+            return;
+        }
+
         if (currentTool === 'eraser') { setIsDrawing(true); eraseObjectAt(pos.x, pos.y); return; }
+
         if (currentTool === 'pen') {
             setIsDrawing(true);
             const canvas = mainCanvasRef.current;
@@ -479,9 +552,8 @@ export const useEditorLogic = (strategyId: string) => {
     const handleMouseMove = (e: React.MouseEvent) => {
         if (draggingObjectId !== null && trashRef.current) {
             const trashRect = trashRef.current.getBoundingClientRect();
-            const isOver = e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
-                e.clientY >= trashRect.top && e.clientY <= trashRect.bottom;
-            setIsOverTrash(isOver);
+            setIsOverTrash(e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
+                e.clientY >= trashRect.top && e.clientY <= trashRect.bottom);
         } else if (isOverTrash) {
             setIsOverTrash(false);
         }
@@ -502,24 +574,22 @@ export const useEditorLogic = (strategyId: string) => {
         broadcastCursor(pos.x, pos.y);
 
         if (draggingObjectId !== null) {
+            // FLUIDITÉ : On met à jour UNIQUEMENT la Ref et le Canvas, pas le State React !
             const updatedList = drawingsRef.current.map(obj => {
                 if (obj.id !== draggingObjectId) return obj;
 
                 if (obj.tool === 'vision') {
                     const vision = obj as VisionObject;
-
                     if (specialDragMode === 'move') {
                         const newX = pos.x - dragOffset.x;
                         const newY = pos.y - dragOffset.y;
                         broadcastMove(obj.id, newX, newY);
                         return { ...vision, x: newX, y: newY };
                     }
-
                     if (specialDragMode === 'rotate') {
                         const dx = pos.x - vision.x;
                         const dy = pos.y - vision.y;
                         const newRotation = Math.atan2(dy, dx);
-
                         return { ...vision, rotation: newRotation };
                     }
                 }
@@ -545,8 +615,8 @@ export const useEditorLogic = (strategyId: string) => {
                 }
                 return updatedObj;
             });
-            drawingsRef.current = updatedList;
-            redrawMainCanvas();
+            drawingsRef.current = updatedList; // Mise à jour Ref
+            redrawMainCanvas(); // Redessiner
             return;
         }
 
@@ -573,54 +643,38 @@ export const useEditorLogic = (strategyId: string) => {
     };
 
     const handleMouseUp = () => {
-        if (draggingObjectId !== null && isOverTrash) {
-            const updatedDrawings = drawingsRef.current.filter(obj => obj.id !== draggingObjectId);
-            drawingsRef.current = updatedDrawings;
-            setSteps(prev => {
-                const newSteps = [...prev];
-                if (newSteps[currentStepIndex]) {
-                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: updatedDrawings };
-                }
-                debouncedSave.cancel();
-                immediateSave(newSteps);
-                return newSteps;
-            });
+        if (draggingObjectId !== null) {
+            // COMMIT DU DRAG : C'est ici qu'on met à jour le State React et la DB
+            if (isOverTrash) {
+                const updatedDrawings = drawingsRef.current.filter(obj => obj.id !== draggingObjectId);
+                drawingsRef.current = updatedDrawings;
+            }
+
+            // Sync with Steps State via REF to avoid closure issues
+            const newSteps = [...stepsRef.current];
+            if (newSteps[currentStepIndexRef.current]) {
+                newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: drawingsRef.current };
+            }
+
+            updateStepsIfChanged(newSteps); // SMART UPDATE
+            lastSavedDataRef.current = JSON.stringify(newSteps);
+            debouncedSaveData.cancel();
+            immediateSave(newSteps, currentStepIndexRef.current);
+
             setIsOverTrash(false);
             setDraggingObjectId(null);
             setSpecialDragMode(null);
             setDragOffset({ x: 0, y: 0 });
-            isInteractingRef.current = false;
+            interactionTimeoutRef.current = setTimeout(() => { isInteractingRef.current = false; }, 800);
             redrawMainCanvas();
             return;
         }
 
-        if (isDrawing || draggingObjectId !== null) {
+        if (isDrawing) {
             if (JSON.stringify(startHistoryRef.current) !== JSON.stringify(drawingsRef.current)) {
                 addToHistory(startHistoryRef.current);
             }
-        }
 
-        if (draggingObjectId !== null) {
-            const finalData = [...drawingsRef.current];
-            setSteps(prev => {
-                const newSteps = [...prev];
-                if (newSteps[currentStepIndex]) {
-                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: finalData };
-                }
-                debouncedSave.cancel();
-                immediateSave(newSteps);
-                return newSteps;
-            });
-        }
-
-        if (isPanning) {
-            setIsPanning(false);
-            if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab');
-        }
-        setDraggingObjectId(null); setSpecialDragMode(null); setDragOffset({ x: 0, y: 0 });
-        setIsOverTrash(false);
-
-        if (isDrawing) {
             setIsDrawing(false);
             if (currentTool === 'pen') {
                 if (pointsRef.current.length > 1) {
@@ -635,15 +689,14 @@ export const useEditorLogic = (strategyId: string) => {
                     };
                     drawingsRef.current = [...drawingsRef.current, newPenObject];
 
-                    setSteps(prev => {
-                        const newSteps = [...prev];
-                        if (newSteps[currentStepIndex]) {
-                            newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: drawingsRef.current };
-                        }
-                        debouncedSave.cancel();
-                        immediateSave(newSteps);
-                        return newSteps;
-                    });
+                    const newSteps = [...stepsRef.current];
+                    if (newSteps[currentStepIndexRef.current]) {
+                        newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: drawingsRef.current };
+                    }
+                    updateStepsIfChanged(newSteps);
+                    lastSavedDataRef.current = JSON.stringify(newSteps);
+                    debouncedSaveData.cancel();
+                    immediateSave(newSteps, currentStepIndexRef.current);
                 }
                 const tempCtx = getContext(tempCanvasRef);
                 if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
@@ -651,140 +704,67 @@ export const useEditorLogic = (strategyId: string) => {
             pointsRef.current = [];
         }
 
-        isInteractingRef.current = false;
+        if (isPanning) {
+            setIsPanning(false);
+            if(containerRef.current) containerRef.current.style.cursor = currentTool === 'cursor' ? 'default' : (currentTool ? 'crosshair' : 'grab');
+        }
+
+        setIsOverTrash(false);
+        interactionTimeoutRef.current = setTimeout(() => { isInteractingRef.current = false; }, 800);
     };
 
-    const handleMouseLeave = () => {
-        handleMouseUp();
-        isInteractingRef.current = false;
-        setIsOverTrash(false);
-    };
+    const handleMouseLeave = () => { handleMouseUp(); };
 
     const handleClearAll = () => {
         addToHistory(drawingsRef.current);
         drawingsRef.current = [];
         redrawMainCanvas();
         setCurrentTool('cursor');
-
         if(strategyId) {
-            setSteps(prevSteps => {
-                const newSteps = prevSteps.map((s, i) =>
-                    i === currentStepIndex ? { ...s, data: [] } : s
-                );
-                debouncedSave.cancel();
-                immediateSave(newSteps, currentStepIndex);
-                return newSteps;
-            });
+            const newSteps = stepsRef.current.map((s, i) => i === currentStepIndexRef.current ? { ...s, data: [] } : s);
+            updateStepsIfChanged(newSteps);
+            lastSavedDataRef.current = JSON.stringify(newSteps);
+            debouncedSaveData.cancel();
+            immediateSave(newSteps, currentStepIndexRef.current);
         }
     };
 
-    const handleClearType = (typeFilter: (obj: DrawingObject) => boolean) => {
-        const newDrawings = drawingsRef.current.filter(obj => !typeFilter(obj));
+    const handleClearType = (filter: (obj: DrawingObject) => boolean) => {
+        const newDrawings = drawingsRef.current.filter(obj => !filter(obj));
         drawingsRef.current = newDrawings;
         redrawMainCanvas();
         if(strategyId) {
-            setSteps(prevSteps => {
-                const newSteps = prevSteps.map((s, i) =>
-                    i === currentStepIndex ? { ...s, data: newDrawings } : s
-                );
-                debouncedSave.cancel();
-                immediateSave(newSteps, currentStepIndex);
-                return newSteps;
-            });
+            const newSteps = stepsRef.current.map((s, i) => i === currentStepIndexRef.current ? { ...s, data: newDrawings } : s);
+            updateStepsIfChanged(newSteps);
+            lastSavedDataRef.current = JSON.stringify(newSteps);
+            debouncedSaveData.cancel();
+            immediateSave(newSteps, currentStepIndexRef.current);
         }
     };
     const handleClearAgents = () => handleClearType(obj => obj.tool === 'image' && obj.subtype === 'agent');
-    const handleClearAbilities = () => handleClearType(obj =>
-        (obj.tool === 'image' && obj.subtype === 'ability') ||
-        (!['image', 'text', 'pen', 'rect'].includes(obj.tool as string) && !obj.lineType)
-    );
+    const handleClearAbilities = () => handleClearType(obj => (obj.tool === 'image' && obj.subtype === 'ability') || (!['image', 'text', 'pen', 'rect'].includes(obj.tool as string) && !obj.lineType));
     const handleClearText = () => handleClearType(obj => obj.tool === 'text');
-    const handleClearDrawings = () => handleClearType(obj =>
-        ['pen', 'dashed', 'arrow', 'dashed-arrow', 'rect'].includes(obj.tool as string) ||
-        (obj.tool === 'pen')
-    );
+    const handleClearDrawings = () => handleClearType(obj => ['pen', 'dashed', 'arrow', 'dashed-arrow', 'rect'].includes(obj.tool as string) || (obj.tool === 'pen'));
 
+    // --- UTILS ---
     const getCursorStyle = () => {
         if (transformRef.current.scale <= 0.501) {
             if (currentTool === 'cursor') return 'default';
         }
-
         if (isPanning) return 'grabbing';
-        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') {
-            return 'default';
-        }
+        if (currentTool === 'cursor' || currentTool === 'tools' || currentTool === 'settings') return 'default';
         if (currentTool === 'eraser') return 'crosshair';
         return 'crosshair';
     };
 
-    const handleAddNote = () => {
-        setSteps(prevSteps => {
-            const newSteps = [...prevSteps];
-            const currentNotes = newSteps[currentStepIndex].notes || [];
-
-            newSteps[currentStepIndex] = {
-                ...newSteps[currentStepIndex],
-                notes: [
-                    ...currentNotes,
-                    {
-                        id: generateId().toString(),
-                        text: 'Nouvelle note',
-                        createdAt: Date.now(),
-                        color: '#ffffff',
-                        fontSize: 16,
-                        fontWeight: 'normal',
-                        fontStyle: 'normal',
-                        textDecoration: 'none',
-                        backgroundColor: null
-                    }
-                ]
-            };
-            immediateSave(newSteps);
-            return newSteps;
-        });
-    };
-
-    const handleUpdateNote = (noteId: string, updates: Partial<StrategyNote>) => {
-        setSteps(prevSteps => {
-            const newSteps = [...prevSteps];
-            const currentStep = newSteps[currentStepIndex];
-            if (!currentStep.notes) return prevSteps;
-
-            const noteIndex = currentStep.notes.findIndex(n => n.id === noteId);
-            if (noteIndex === -1) return prevSteps;
-
-            const updatedNotes = [...currentStep.notes];
-            updatedNotes[noteIndex] = { ...updatedNotes[noteIndex], ...updates };
-
-            newSteps[currentStepIndex] = { ...currentStep, notes: updatedNotes };
-
-            debouncedSave(strategyId, newSteps, currentStepIndex);
-            return newSteps;
-        });
-        setIsTextModalOpen(false);
-        setEditingNoteId(null);
-    };
-    const handleDeleteNote = (noteId: string) => {
-        setSteps(prevSteps => {
-            const newSteps = [...prevSteps];
-            const currentStep = newSteps[currentStepIndex];
-            if (!currentStep.notes) return prevSteps;
-
-            newSteps[currentStepIndex] = {
-                ...currentStep,
-                notes: currentStep.notes.filter(n => n.id !== noteId)
-            };
-            immediateSave(newSteps);
-            return newSteps;
-        });
-    };
-
+    // --- CONTEXT MENU ---
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
         const pos = getMousePos(e);
         const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
         const finalX = pos.x;
         const finalY = pos.y;
+
         const currentList = [...drawingsRef.current];
         let hasDeleted = false;
         const mapScale = getCurrentScale();
@@ -793,6 +773,7 @@ export const useEditorLogic = (strategyId: string) => {
         for (let i = currentList.length - 1; i >= 0; i--) {
             const obj = currentList[i];
             let hit = false;
+
             if (obj.tool === 'image' && obj.x != null && obj.y != null) {
                 const w = (obj.width || iconSize) * mapScale;
                 const h = (obj.height || iconSize) * mapScale;
@@ -828,6 +809,7 @@ export const useEditorLogic = (strategyId: string) => {
                 // @ts-expect-error - checkAbilityHit with partial
                 if (checkAbilityHit(pos, obj, mapScale)) hit = true;
             }
+
             if (hit) {
                 addToHistory(drawingsRef.current);
                 currentList.splice(i, 1);
@@ -835,26 +817,98 @@ export const useEditorLogic = (strategyId: string) => {
                 break;
             }
         }
+
         if (hasDeleted) {
             drawingsRef.current = currentList;
             redrawMainCanvas();
-            setSteps(prevSteps => {
-                const newSteps = [...prevSteps];
-                if (newSteps[currentStepIndex]) {
-                    newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: currentList };
-                }
-                debouncedSave.cancel();
-                immediateSave(newSteps);
-                return newSteps;
-            });
+
+            const newSteps = [...stepsRef.current];
+            if (newSteps[currentStepIndexRef.current]) {
+                newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: currentList };
+            }
+            updateStepsIfChanged(newSteps);
+            lastSavedDataRef.current = JSON.stringify(newSteps);
+            debouncedSaveData.cancel();
+            immediateSave(newSteps, currentStepIndexRef.current);
         }
     };
 
+    // Step Helpers
+    const handleAddStep = () => { const n = [...stepsRef.current, { id: generateId().toString(), name: `Phase ${stepsRef.current.length + 1}`, data: [], notes: [] }]; const idx = stepsRef.current.length; updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); immediateSave(n, idx); setCurrentStepIndex(idx); };
+    const handleDuplicateStep = () => { const curr = stepsRef.current[currentStepIndexRef.current]; const n = [...stepsRef.current]; n.splice(currentStepIndexRef.current + 1, 0, { id: generateId().toString(), name: `${curr.name} (Copy)`, data: JSON.parse(JSON.stringify(curr.data)), notes: JSON.parse(JSON.stringify(curr.notes || [])) }); const idx = currentStepIndexRef.current + 1; updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); immediateSave(n, idx); setCurrentStepIndex(idx); };
+    const handleDeleteStep = (idx: number) => { if (stepsRef.current.length <= 1) return; const n = stepsRef.current.filter((_, i) => i !== idx); const newIdx = currentStepIndexRef.current >= idx && currentStepIndexRef.current > 0 ? currentStepIndexRef.current - 1 : currentStepIndexRef.current; updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); immediateSave(n, newIdx); setCurrentStepIndex(newIdx); };
+    const handleRenameStep = (idx: number, name: string) => { const n = stepsRef.current.map((s, i) => i === idx ? { ...s, name } : s); updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); immediateSave(n, currentStepIndexRef.current); };
+
+    // Note Helpers
+    const handleAddNote = () => { const n = [...stepsRef.current]; const notes = n[currentStepIndexRef.current].notes || []; n[currentStepIndexRef.current] = { ...n[currentStepIndexRef.current], notes: [...notes, { id: generateId().toString(), text: 'Nouvelle note', createdAt: Date.now(), color: '#ffffff', fontSize: 16, fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', backgroundColor: null }] }; updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); immediateSave(n, currentStepIndexRef.current); };
+    const handleUpdateNote = (id: string, u: Partial<StrategyNote>) => { const n = [...stepsRef.current]; const s = n[currentStepIndexRef.current]; if(!s.notes) return; const idx = s.notes.findIndex(x=>x.id===id); if(idx===-1) return; s.notes[idx]={...s.notes[idx], ...u}; updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); debouncedSaveData(strategyId, n, currentStepIndexRef.current); };
+    const handleDeleteNote = (id: string) => { const n = [...stepsRef.current]; const s = n[currentStepIndexRef.current]; if(!s.notes) return; s.notes = s.notes.filter(x=>x.id!==id); updateStepsIfChanged(n); lastSavedDataRef.current = JSON.stringify(n); immediateSave(n, currentStepIndexRef.current); };
+
+    // Text & Drop Helpers
+    const handleSaveText = (d: { text: string; color: string; fontSize: number; isBold: boolean; isItalic: boolean }) => {
+        addToHistory(drawingsRef.current);
+        let currentList = [...drawingsRef.current];
+        if (editingTextId !== null) {
+            currentList = currentList.map(obj => obj.id === editingTextId ? { ...obj, text: d.text, color: d.color, fontSize: d.fontSize, fontWeight: d.isBold ? 'bold' : 'normal', fontStyle: d.isItalic ? 'italic' : 'normal' } : obj);
+            setEditingTextId(null);
+        } else {
+            // Création d'un nouveau texte
+            let x = 100, y = 100;
+            if (clickPosRef.current) {
+                x = clickPosRef.current.x;
+                y = clickPosRef.current.y;
+            } else if (containerRef.current && imgRef.current) {
+                const containerRect = containerRef.current.getBoundingClientRect();
+                const { x: tx, y: ty, scale } = transformRef.current;
+                x = (containerRect.width / 2 - tx) / scale;
+                y = (containerRect.height / 2 - ty) / scale;
+            }
+
+            const newText: DrawingObject = {
+                id: generateId(), tool: 'text', text: d.text, points: [], x: x, y: y, color: d.color, fontSize: d.fontSize,
+                fontWeight: d.isBold ? 'bold' : 'normal', fontStyle: d.isItalic ? 'italic' : 'normal', thickness: 0, opacity: 1
+            };
+            currentList.push(newText);
+        }
+
+        drawingsRef.current = currentList;
+
+        const newSteps = [...stepsRef.current];
+        if (newSteps[currentStepIndexRef.current]) newSteps[currentStepIndexRef.current].data = currentList;
+        updateStepsIfChanged(newSteps);
+
+        // Synchro & Save
+        lastSavedDataRef.current = JSON.stringify(newSteps);
+        debouncedSaveData.cancel();
+        immediateSave(newSteps, currentStepIndexRef.current);
+
+        setIsTextModalOpen(false); clickPosRef.current = null; setCurrentTool('cursor'); redrawMainCanvas();
+    };
+
+    const handleDoubleClick = (e: React.MouseEvent) => { const pos = getMousePos(e); for(let i=drawingsRef.current.length-1; i>=0; i--) { const obj = drawingsRef.current[i]; if(obj.tool === 'text' && obj.x !== undefined) { const fontSize = obj.fontSize || 20; const w = (obj.text?.length || 0) * fontSize * 0.6; if (Math.abs(pos.x - obj.x) < w / 2 && Math.abs(pos.y - obj.y!) < fontSize / 2) { setEditingTextId(obj.id); setIsTextModalOpen(true); return; } } } };
+
+    // --- TEXT MENU HANDLER ---
+    const handleTextMenu = (id: number, updates: Partial<DrawingObject>) => {
+        drawingsRef.current = drawingsRef.current.map(obj => obj.id === id ? { ...obj, ...updates } : obj);
+        redrawMainCanvas();
+
+        const newSteps = [...stepsRef.current];
+        if (newSteps[currentStepIndexRef.current]) newSteps[currentStepIndexRef.current].data = drawingsRef.current;
+        updateStepsIfChanged(newSteps);
+
+        lastSavedDataRef.current = JSON.stringify(newSteps);
+        debouncedSaveData.cancel();
+        immediateSave(newSteps, currentStepIndexRef.current);
+    };
+
+    // --- DRAG AND DROP HANDLER ---
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const jsonData = e.dataTransfer.getData("application/json"); if (!jsonData) return;
         try {
-            const { type, name } = JSON.parse(jsonData);
+            // FIX TS: Cast strict pour éviter l'erreur "Argument type"
+            const { type, name } = JSON.parse(jsonData) as { type: ToolType, name: string };
+
             const { x, y } = getMousePos(e);
             const img = imgRef.current; if (!img) return;
             const finalX = clamp(x, 0, img.clientWidth);
@@ -867,206 +921,52 @@ export const useEditorLogic = (strategyId: string) => {
                 const newList = [...drawingsRef.current, newObj];
                 drawingsRef.current = newList;
                 setCurrentTool('cursor');
-                setSteps(prevSteps => {
-                    const newSteps = [...prevSteps];
-                    if (newSteps[currentStepIndex]) {
-                        newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: newList };
-                    }
-                    debouncedSave.cancel();
-                    immediateSave(newSteps);
-                    return newSteps;
-                });
+
+                const newSteps = [...stepsRef.current];
+                if (newSteps[currentStepIndexRef.current]) {
+                    newSteps[currentStepIndexRef.current] = { ...newSteps[currentStepIndexRef.current], data: newList };
+                }
+                updateStepsIfChanged(newSteps);
+
+                // Synchro & Save
+                lastSavedDataRef.current = JSON.stringify(newSteps);
+                debouncedSaveData.cancel();
+                immediateSave(newSteps, currentStepIndexRef.current);
+
+                redrawMainCanvas();
             }
         } catch (err) { console.error("Drop error", err); }
     };
 
-    const handleSaveText = (drawingData: DrawingObject) => {
-        addToHistory(drawingsRef.current);
-
-        const currentList = [...drawingsRef.current];
-
-        const existingIndex = currentList.findIndex(d => d.id === drawingData.id);
-
-        if (existingIndex !== -1) {
-            currentList[existingIndex] = {
-                ...currentList[existingIndex],
-                ...drawingData
-            };
-            setEditingTextId(null);
-        } else {
-            const newTextObj: DrawingObject = {
-                ...drawingData,
-                id: drawingData.id || generateId(),
-                tool: 'text',
-                points: [],
-                thickness: 0,
-                opacity: 1
-            };
-            currentList.push(newTextObj);
-        }
-
-        drawingsRef.current = currentList;
-
-        setSteps(prevSteps => {
-            const newSteps = [...prevSteps];
-            if (newSteps[currentStepIndex]) {
-                newSteps[currentStepIndex] = { ...newSteps[currentStepIndex], data: currentList };
-            }
-            debouncedSave.cancel();
-            immediateSave(newSteps);
-            return newSteps;
-        });
-
-        setIsTextModalOpen(false);
-        setCurrentTool('cursor');
-        redrawMainCanvas();
-    };
-
-    const handleDoubleClick = (e: React.MouseEvent) => {
-        const pos = getMousePos(e);
-        for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
-            const obj = drawingsRef.current[i];
-            if (obj.tool === 'text' && obj.x !== undefined && obj.y !== undefined) {
-                const fontSize = obj.fontSize || 20;
-                const approxWidth = (obj.text?.length || 0) * (fontSize * 0.6);
-                if (Math.abs(pos.x - obj.x) < approxWidth/2 && Math.abs(pos.y - obj.y) < fontSize/2) {
-                    setEditingTextId(obj.id);
-                    setIsTextModalOpen(true);
-                    return;
-                }
-            }
-        }
-    };
-
-    const handleAddStep = () => {
-        setSteps(prevSteps => {
-            const newSteps = [...prevSteps, { id: generateId().toString(), name: `Phase ${prevSteps.length + 1}`, data: [], notes: [] }];
-            const newIndex = prevSteps.length;
-            immediateSave(newSteps, newIndex);
-            setCurrentStepIndex(newIndex);
-            return newSteps;
-        });
-    };
-
-    const handleDuplicateStep = () => {
-        setSteps(prevSteps => {
-            const currentStep = prevSteps[currentStepIndex];
-            const clonedData = JSON.parse(JSON.stringify(currentStep.data));
-            const newStep = {
-                id: generateId().toString(),
-                name: `${currentStep.name} (Copy)`,
-                data: clonedData,
-                notes: currentStep.notes ? JSON.parse(JSON.stringify(currentStep.notes)) : []
-            };
-            const newSteps = [...prevSteps];
-            newSteps.splice(currentStepIndex + 1, 0, newStep);
-            const newIndex = currentStepIndex + 1;
-            immediateSave(newSteps, newIndex);
-            setCurrentStepIndex(newIndex);
-            return newSteps;
-        });
-    };
-
-    const handleDeleteStep = (index: number) => {
-        if (steps.length <= 1) return;
-        setSteps(prevSteps => {
-            const newSteps = prevSteps.filter((_, i) => i !== index);
-            let newIndex = currentStepIndex;
-            if (currentStepIndex >= index && currentStepIndex > 0) {
-                newIndex = currentStepIndex - 1;
-            }
-            immediateSave(newSteps, newIndex);
-            setCurrentStepIndex(newIndex);
-            return newSteps;
-        });
-    };
-
-    const handleRenameStep = (index: number, newName: string) => {
-        setSteps(prevSteps => {
-            const newSteps = prevSteps.map((s, i) => i === index ? { ...s, name: newName } : s);
-            immediateSave(newSteps, currentStepIndex);
-            return newSteps;
-        });
-    };
-
-    const handleNavigateToStrategy = (id: string) => {
-        navigate(`/editor/${id}`);
-    };
-
-    const handleCreateInFolder = () => {
-        if (currentFolderId) {
-            navigate(`/create?folderId=${currentFolderId}`);
-        } else {
-            navigate('/create');
-        }
-    };
-
-    const handleFolderChange = async (newFolderId: string) => {
-        setCurrentFolderId(newFolderId);
-        if (strategyId) {
-            await supabase.from('strategies').update({ folder_id: newFolderId || null }).eq('id', strategyId);
-        }
-    };
-
-    const confirmDelete = async () => {
-        if (!strategyId) return;
-        const { error } = await supabase.from('strategies').delete().eq('id', strategyId);
-        if (!error) navigate('/');
-        else console.error("Error deleting:", error);
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleLoadStrategy = (strat: any) => {
-        if (strat && strat.data) {
-            if (Array.isArray(strat.data)) {
-                setSteps([{ id: 'init', name: 'Setup', data: strat.data, notes: [] }]);
-                setCurrentStepIndex(0);
-            } else if (strat.data.steps) {
-                setSteps(strat.data.steps);
-                setCurrentStepIndex(strat.data.currentStepIndex || 0);
-            }
-        }
-        setShowLoadModal(false);
-    };
+    const handleCreateInFolder = () => navigate(currentFolderId ? `/create?folderId=${currentFolderId}` : '/create');
+    const handleFolderChange = async (fid: string) => { setCurrentFolderId(fid); if (strategyId) await supabase.from('strategies').update({ folder_id: fid || null }).eq('id', strategyId); };
+    const confirmDelete = async () => { if (!strategyId) return; const { error } = await supabase.from('strategies').delete().eq('id', strategyId); if (!error) navigate('/'); };
+    const handleDeleteRequest = () => setShowDeleteModal(true);
+    const handleNavigateToStrategy = (id: string) => navigate(`/editor/${id}`);
+    const handleLoadStrategy = (s: any) => { if (s?.data) { if (Array.isArray(s.data)) { updateStepsIfChanged([{ id: 'init', name: 'Setup', data: s.data }]); setCurrentStepIndex(0); } else if (s.data.steps) { updateStepsIfChanged(s.data.steps); setCurrentStepIndex(s.data.currentStepIndex || 0); } } setShowLoadModal(false); };
 
     return {
         mainCanvasRef, tempCanvasRef, containerRef, imgRef, trashRef, contentRef, centerView, panCanvas,
-        drawings: drawingsRef.current,
-        steps, currentStepIndex, setCurrentStepIndex,
-        currentMapSrc,
-        activeMapSrc,
-        activeCallsSrc,
-        reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
-        reverseMapError, setReverseMapError,
-        reverseCallsError, setReverseCallsError,
+        drawings: drawingsRef.current, steps, currentStepIndex, setCurrentStepIndex,
+        currentMapSrc, activeMapSrc, activeCallsSrc, reverseMapSrc, callsMapSrc, reverseCallsMapSrc,
+        reverseMapError, setReverseMapError, reverseCallsError, setReverseCallsError,
         isLoading, showLoadModal, setShowLoadModal, savedStrategies,
-        isTextModalOpen, setIsTextModalOpen,
-        showDeleteModal, setShowDeleteModal,
-        editingObj, setEditingTextId,
-        folders, currentFolderId,
-        currentTool, setCurrentTool,
-        strokeType, setStrokeType,
-        color, setColor,
-        opacity, setOpacity,
-        thickness, setThickness,
-        selectedAgent, setSelectedAgent,
-        showZones, setShowZones,
-        showMapCalls, setShowMapCalls,
-        iconSize, setIconSize,
-        isRotated, setIsRotated,
+        isTextModalOpen, setIsTextModalOpen, showDeleteModal, setShowDeleteModal,
+        editingObj, setEditingTextId, folders, currentFolderId,
+        currentTool, setCurrentTool, strokeType, setStrokeType, color, setColor, opacity, setOpacity, thickness, setThickness, selectedAgent, setSelectedAgent,
+        // Ajout des états manquants
+        selectedAbility, setSelectedAbility,
+        showZones, setShowZones, showMapCalls, setShowMapCalls, iconSize, setIconSize,
+        // ICI : On passe la fonction personnalisée au lieu du setter classique
+        isRotated, setIsRotated: handleToggleRotation,
         isOverTrash, getCursorStyle,
-        handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave,
-        handleContextMenu, handleDrop, handleDoubleClick,
+        handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleContextMenu, handleDrop, handleDoubleClick,
         handleClearAll, handleClearAgents, handleClearAbilities, handleClearText, handleClearDrawings,
         handleSaveText, handleLoadStrategy,
         handleAddStep, handleDuplicateStep, handleDeleteStep, handleRenameStep,
-        handleFolderChange, handleDeleteRequest: () => setShowDeleteModal(true), confirmDelete,
-        fetchStrategies,
-        remoteCursors,
-        handleNavigateToStrategy,
-        handleCreateInFolder,
-        editingNoteId, setEditingNoteId,
-        handleAddNote, handleUpdateNote, handleDeleteNote,
+        handleFolderChange, handleDeleteRequest, confirmDelete,
+        fetchStrategies, remoteCursors, handleNavigateToStrategy, handleCreateInFolder,
+        editingNoteId, setEditingNoteId, handleAddNote, handleUpdateNote, handleDeleteNote, handleTextMenu,
         currentNotes: steps[currentStepIndex]?.notes || [],
     };
 };

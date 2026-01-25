@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../supabaseClient.ts';
+import { supabase } from '../supabaseClient'; // Assure-toi que le chemin est bon
 import { useAuth } from '../contexts/AuthContext';
-import type { DrawingObject } from '../types/canvas';
 
 // Mise à jour des interfaces pour inclure team_id
 export interface Folder {
@@ -19,7 +18,7 @@ export interface Strategy {
     user_id: string;
     folder_id: number | null;
     team_id: string | null;
-    data: DrawingObject[];
+    data: any; // Contient { steps: [], currentStepIndex: 0 }
     created_at: string;
     updated_at: string;
 }
@@ -33,7 +32,6 @@ export const useSupabaseStrategies = () => {
 
     // --- STRATEGIES ---
 
-    // Accepte un teamId optionnel pour filtrer
     const fetchStrategies = useCallback(async (teamId: string | null = null) => {
         if (!user) return;
         setIsLoading(true);
@@ -44,10 +42,8 @@ export const useSupabaseStrategies = () => {
             .order('updated_at', { ascending: false });
 
         if (teamId) {
-            // MODE ÉQUIPE : On cherche les strats qui appartiennent à l'équipe
             query = query.eq('team_id', teamId);
         } else {
-            // MODE PERSO : Mes strats + Celles qui n'ont PAS de team_id
             query = query.eq('user_id', user.id).is('team_id', null);
         }
 
@@ -69,12 +65,11 @@ export const useSupabaseStrategies = () => {
         return data;
     };
 
-    // --- MODIFICATION ICI : Ajout de folderId ---
     const createNewStrategy = async (
         mapName: string,
         title: string,
         teamId: string | null = null,
-        folderId: number | null = null // <--- NOUVEL ARGUMENT
+        folderId: number | null = null
     ) => {
         if (!user) return null;
 
@@ -82,9 +77,9 @@ export const useSupabaseStrategies = () => {
             user_id: user.id,
             map_name: mapName,
             title: title,
-            name: title, // Rétrocompatibilité
-            data: [],
-            folder_id: folderId || null, // <--- ENREGISTREMENT DU DOSSIER
+            name: title,
+            data: { steps: [{ id: 'init', name: 'Setup', data: [], notes: [] }], currentStepIndex: 0 },
+            folder_id: folderId || null,
             team_id: teamId || null
         };
 
@@ -101,13 +96,16 @@ export const useSupabaseStrategies = () => {
         return data;
     };
 
-    const updateStrategyData = async (id: string, drawingData: any[]) => {
+    // --- MISE À JOUR (Flexible) ---
+    // Accepte un objet partiel (ex: { data: ... }) et ne met à jour que ça.
+    const updateStrategyData = useCallback(async (id: string, updates: Partial<Strategy>) => {
         const { error } = await supabase
             .from('strategies')
-            .update({ data: drawingData, updated_at: new Date().toISOString() })
+            .update({ ...updates, updated_at: new Date().toISOString() })
             .eq('id', id);
+
         if (error) console.error("Erreur save:", error);
-    };
+    }, []);
 
     const deleteStrategy = async (id: string) => {
         const { error } = await supabase
