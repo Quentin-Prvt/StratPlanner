@@ -19,10 +19,7 @@ export const RemoteCursorOverlay = ({ cursors, isRotated = false }: RemoteCursor
         <div
             className="absolute inset-0 pointer-events-none z-50 overflow-hidden"
             style={{
-                // 1. On tourne TOUT le calque de 180° pour que les coordonnées X/Y
-                // s'alignent avec l'image de la map qui est elle aussi tournée.
                 transform: isRotated ? 'rotate(180deg)' : 'none',
-                // Important : On tourne par rapport au centre, comme l'image de la map
                 transformOrigin: 'center center'
             }}
         >
