@@ -15,7 +15,7 @@ interface StepsBarProps {
 export const StepsBar = ({ steps, currentIndex, onStepChange, onAddStep, onDuplicateStep, onDeleteStep, onRenameStep }: StepsBarProps) => {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editName, setEditName] = useState("");
-    const MAX_STEPS = 12;
+    const MAX_STEPS = 14;
 
     // --- GESTION RACCOURCIS CLAVIER (Q / D) ---
     useEffect(() => {
